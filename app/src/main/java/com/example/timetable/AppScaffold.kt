@@ -1,6 +1,5 @@
 package com.example.timetable
 
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -18,13 +17,15 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 
 private enum class Tab(val route: String, val label: String, val icon: ImageVector) {
     Today("today", "Сегодня", Icons.Filled.CalendarToday),
@@ -33,34 +34,56 @@ private enum class Tab(val route: String, val label: String, val icon: ImageVect
     Settings("settings", "Настройки", Icons.Filled.Settings),
 }
 
+private const val EDITOR_ROUTE = "editor"
+private const val EDITOR_ID_ARG = "id"
+private const val NEW_EVENT_ID = -1L
+
 @Composable
 fun AppScaffold() {
     val nav = rememberNavController()
     val backStack by nav.currentBackStackEntryAsState()
     val currentRoute = backStack?.destination?.route
+    val isTab = Tab.entries.any { it.route == currentRoute }
+    val showNavLabels by AppPrefs.showNavLabels
 
     Scaffold(
         floatingActionButton = {
-            FloatingActionButton(onClick = { /* потом */ }) {
-                Icon(Icons.Filled.Add, contentDescription = "Добавить")
+            // фаб только на табах, в редакторе он не нужен
+            if (isTab) {
+                FloatingActionButton(onClick = { nav.navigate("$EDITOR_ROUTE?$EDITOR_ID_ARG=$NEW_EVENT_ID") }) {
+                    Icon(Icons.Filled.Add, contentDescription = "Добавить")
+                }
             }
         },
         bottomBar = {
-            NavigationBar {
-                Tab.entries.forEach { tab ->
-                    NavigationBarItem(
-                        selected = currentRoute == tab.route,
-                        onClick = {
-                            nav.navigate(tab.route) {
-                                // чтоб стек не рос если кликать туда-сюда
-                                popUpTo(Tab.Today.route) { saveState = true }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
-                        },
-                        icon = { Icon(tab.icon, contentDescription = tab.label) },
-                        label = { Text(tab.label) },
-                    )
+            if (isTab) {
+                NavigationBar {
+                    Tab.entries.forEach { tab ->
+                        NavigationBarItem(
+                            selected = currentRoute == tab.route,
+                            onClick = {
+                                nav.navigate(tab.route) {
+                                    // чтоб стек не рос если кликать туда-сюда
+                                    popUpTo(Tab.Today.route) { saveState = true }
+                                    launchSingleTop = true
+                                    restoreState = true
+                                }
+                            },
+                            icon = { Icon(tab.icon, contentDescription = tab.label) },
+                            label = if (showNavLabels) {
+                                {
+                                    // на крупном системном шрифте 'Расписания' и 'Настройки'
+                                    // переносятся на 2 строки, поэтому жмём в одну с многоточием
+                                    Text(
+                                        text = tab.label,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        style = MaterialTheme.typography.labelSmall,
+                                    )
+                                }
+                            } else null,
+                        )
+                    }
                 }
             }
         },
@@ -72,17 +95,42 @@ fun AppScaffold() {
                 .padding(inner)
                 .fillMaxSize(),
         ) {
-            composable(Tab.Today.route) { Stub("Сегодня") }
-            composable(Tab.Week.route) { Stub("Неделя") }
-            composable(Tab.Schedules.route) { Stub("Расписания") }
-            composable(Tab.Settings.route) { Stub("Настройки") }
+            composable(Tab.Today.route) {
+                TodayScreen(onEventClick = { id ->
+                    nav.navigate("$EDITOR_ROUTE?$EDITOR_ID_ARG=$id")
+                })
+            }
+            composable(Tab.Week.route) {
+                EmptyScreen(
+                    title = "Неделя",
+                    subtitle = "недельный календарь появится здесь",
+                    icon = Icons.Filled.CalendarToday,
+                )
+            }
+            composable(Tab.Schedules.route) {
+                EmptyScreen(
+                    title = "Расписания",
+                    subtitle = "сохранённые расписания и пресеты появятся здесь",
+                    icon = Icons.Filled.Description,
+                )
+            }
+            composable(Tab.Settings.route) { SettingsScreen() }
+            composable(
+                route = "$EDITOR_ROUTE?$EDITOR_ID_ARG={$EDITOR_ID_ARG}",
+                arguments = listOf(
+                    navArgument(EDITOR_ID_ARG) {
+                        type = NavType.LongType
+                        defaultValue = NEW_EVENT_ID
+                    },
+                ),
+            ) { entry ->
+                val id = entry.arguments?.getLong(EDITOR_ID_ARG) ?: NEW_EVENT_ID
+                EventEditorScreen(
+                    eventId = id.takeIf { it != NEW_EVENT_ID },
+                    onClose = { nav.popBackStack() },
+                )
+            }
         }
     }
 }
 
-@Composable
-private fun Stub(name: String) {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Text(text = "$name, скоро будет", style = MaterialTheme.typography.titleMedium)
-    }
-}
