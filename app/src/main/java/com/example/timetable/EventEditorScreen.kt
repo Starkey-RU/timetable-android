@@ -27,10 +27,13 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DatePicker
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -43,7 +46,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.collectAsState
 import androidx.lifecycle.viewmodel.compose.viewModel
+import java.time.Instant
+import java.time.LocalDate
 import java.time.LocalTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -54,9 +62,16 @@ fun EventEditorScreen(eventId: Long?, onClose: () -> Unit) {
         factory = remember(eventId) { EventEditorViewModel.factory(app.eventRepository, eventId) },
     )
     val form by vm.form.collectAsState()
+    val notFound by vm.notFound.collectAsState()
+
+    // если событие удалили пока редактор грузился - просто выходим
+    LaunchedEffect(notFound) {
+        if (notFound) onClose()
+    }
 
     var showStartPicker by remember { mutableStateOf(false) }
     var showEndPicker by remember { mutableStateOf(false) }
+    var showDatePicker by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -94,6 +109,12 @@ fun EventEditorScreen(eventId: Long?, onClose: () -> Unit) {
 
             Text("Цвет", style = MaterialTheme.typography.labelLarge)
             ColorChipsRow(selected = form.colorKey, onPick = vm::setColor)
+
+            DateField(
+                value = form.date,
+                onClick = { showDatePicker = true },
+                modifier = Modifier.fillMaxWidth(),
+            )
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -154,7 +175,45 @@ fun EventEditorScreen(eventId: Long?, onClose: () -> Unit) {
             },
         )
     }
+    if (showDatePicker) {
+        PickDate(
+            initial = form.date,
+            onDismiss = { showDatePicker = false },
+            onPick = {
+                vm.setDate(it)
+                showDatePicker = false
+            },
+        )
+    }
 }
+
+@Composable
+private fun DateField(
+    value: LocalDate,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+    ) {
+        Text(
+            text = "Дата",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text = value.format(dateFormatter),
+            style = MaterialTheme.typography.titleMedium,
+        )
+    }
+}
+
+private val dateFormatter: DateTimeFormatter =
+    DateTimeFormatter.ofPattern("EEEE, d MMMM", Locale("ru"))
 
 @Composable
 private fun TimeField(
@@ -243,6 +302,34 @@ private fun PickTime(
             TextButton(onClick = onDismiss) { Text("Отмена") }
         },
         text = { TimePicker(state = state) },
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PickDate(
+    initial: LocalDate,
+    onDismiss: () -> Unit,
+    onPick: (LocalDate) -> Unit,
+) {
+    val zone = ZoneId.systemDefault()
+    val initialMillis = initial.atStartOfDay(zone).toInstant().toEpochMilli()
+    val state = rememberDatePickerState(initialSelectedDateMillis = initialMillis)
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    val millis = state.selectedDateMillis ?: return@TextButton
+                    val date = Instant.ofEpochMilli(millis).atZone(zone).toLocalDate()
+                    onPick(date)
+                },
+            ) { Text("Ок") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Отмена") }
+        },
+        text = { DatePicker(state = state) },
     )
 }
 

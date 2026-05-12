@@ -9,9 +9,13 @@ class EventRepository(private val dao: EventDao) {
     fun observeInRange(fromMillis: Long, toMillis: Long): Flow<List<EventEntity>> =
         dao.observeInRange(fromMillis, toMillis)
 
+    suspend fun getById(id: Long): EventEntity? = dao.getById(id)
+
     suspend fun add(event: EventEntity): Long = dao.insert(event)
 
     suspend fun update(event: EventEntity) = dao.update(event)
 
     suspend fun delete(event: EventEntity) = dao.delete(event)
+
+    suspend fun deleteById(id: Long) = dao.deleteById(id)
 }

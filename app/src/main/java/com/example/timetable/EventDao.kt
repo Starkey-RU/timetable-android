@@ -17,6 +17,9 @@ interface EventDao {
     @Query("SELECT * FROM events WHERE startMillis < :toMillis AND endMillis > :fromMillis ORDER BY startMillis")
     fun observeInRange(fromMillis: Long, toMillis: Long): Flow<List<EventEntity>>
 
+    @Query("SELECT * FROM events WHERE id = :id LIMIT 1")
+    suspend fun getById(id: Long): EventEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(event: EventEntity): Long
 
@@ -28,4 +31,7 @@ interface EventDao {
 
     @Delete
     suspend fun delete(event: EventEntity)
+
+    @Query("DELETE FROM events WHERE id = :id")
+    suspend fun deleteById(id: Long)
 }

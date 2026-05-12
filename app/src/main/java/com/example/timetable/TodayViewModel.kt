@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.ZoneId
 
@@ -21,7 +22,7 @@ data class TodayState(
     val nowMillis: Long = 0L,
 )
 
-class TodayViewModel(repo: EventRepository) : ViewModel() {
+class TodayViewModel(private val repo: EventRepository) : ViewModel() {
 
     private val zone = ZoneId.systemDefault()
 
@@ -35,6 +36,10 @@ class TodayViewModel(repo: EventRepository) : ViewModel() {
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = TodayState(),
     )
+
+    fun delete(id: Long) {
+        viewModelScope.launch { repo.deleteById(id) }
+    }
 
     private fun startOfToday(): Long =
         LocalDate.now(zone).atStartOfDay(zone).toInstant().toEpochMilli()

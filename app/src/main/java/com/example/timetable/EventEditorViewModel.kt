@@ -8,7 +8,6 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.LocalTime
@@ -34,12 +33,18 @@ class EventEditorViewModel(
 
     val isEditing: Boolean = eventId != null
 
+    private val _notFound = MutableStateFlow(false)
+    val notFound: StateFlow<Boolean> = _notFound.asStateFlow()
+
     init {
         if (eventId != null) {
             viewModelScope.launch {
-                // тащим разовым snapshot, для редактирования стрим не нужен
-                val all = repo.observeAll().first()
-                val ev = all.firstOrNull { it.id == eventId } ?: return@launch
+                val ev = repo.getById(eventId)
+                if (ev == null) {
+                    // событие удалили из-под нас, экран закроется
+                    _notFound.value = true
+                    return@launch
+                }
                 _form.value = EditorForm(
                     title = ev.title,
                     location = ev.location,
@@ -57,6 +62,7 @@ class EventEditorViewModel(
     fun setColor(key: String) { _form.value = _form.value.copy(colorKey = key) }
     fun setStart(time: LocalTime) { _form.value = _form.value.copy(start = time) }
     fun setEnd(time: LocalTime) { _form.value = _form.value.copy(end = time) }
+    fun setDate(date: LocalDate) { _form.value = _form.value.copy(date = date) }
 
     fun save(onDone: () -> Unit) {
         val f = _form.value
@@ -78,10 +84,7 @@ class EventEditorViewModel(
     fun delete(onDone: () -> Unit) {
         val id = eventId ?: return
         viewModelScope.launch {
-            // нужен entity для @Delete, проще достать снэпшот и снести
-            val all = repo.observeAll().first()
-            val ev = all.firstOrNull { it.id == id } ?: return@launch
-            repo.delete(ev)
+            repo.deleteById(id)
             onDone()
         }
     }
