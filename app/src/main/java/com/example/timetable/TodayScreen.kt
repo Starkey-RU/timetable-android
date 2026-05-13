@@ -74,6 +74,12 @@ fun TodayScreen(onEventClick: (Long) -> Unit = {}) {
     // событие, по которому долго нажали - показываем шторку с действиями
     var pickedForActions by remember { mutableStateOf<EventEntity?>(null) }
 
+    // одна "сегодняшняя" дата на весь экран чтоб карточки не ушли в разные дни
+    val today = remember(state.nowMillis) {
+        if (state.nowMillis == 0L) LocalDate.now()
+        else Instant.ofEpochMilli(state.nowMillis).atZone(ZoneId.systemDefault()).toLocalDate()
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -109,6 +115,7 @@ fun TodayScreen(onEventClick: (Long) -> Unit = {}) {
                 item(key = "now-${ev.id}") {
                     EventCard(
                         event = ev,
+                        today = today,
                         badge = "Сейчас",
                         emphasized = true,
                         nowMillis = state.nowMillis,
@@ -121,6 +128,7 @@ fun TodayScreen(onEventClick: (Long) -> Unit = {}) {
                 item(key = "next-${ev.id}") {
                     EventCard(
                         event = ev,
+                        today = today,
                         badge = "Дальше",
                         onClick = { onEventClick(ev.id) },
                         onLongClick = { pickedForActions = ev },
@@ -132,6 +140,7 @@ fun TodayScreen(onEventClick: (Long) -> Unit = {}) {
                 items(state.later, key = { "later-${it.id}" }) { ev ->
                     EventCard(
                         event = ev,
+                        today = today,
                         onClick = { onEventClick(ev.id) },
                         onLongClick = { pickedForActions = ev },
                     )
@@ -142,6 +151,7 @@ fun TodayScreen(onEventClick: (Long) -> Unit = {}) {
                 items(state.done, key = { "done-${it.id}" }) { ev ->
                     EventCard(
                         event = ev,
+                        today = today,
                         completed = true,
                         onClick = { onEventClick(ev.id) },
                         onLongClick = { pickedForActions = ev },
@@ -204,6 +214,7 @@ private fun EventActionsSheet(
 @Composable
 private fun EventCard(
     event: EventEntity,
+    today: LocalDate,
     badge: String? = null,
     emphasized: Boolean = false,
     completed: Boolean = false,
@@ -265,7 +276,7 @@ private fun EventCard(
                         if (completed) it.copy(alpha = 0.52f) else it
                     }
                     Text(
-                        text = "${formatTime(event.startMillis)} - ${formatTime(event.endMillis)}",
+                        text = formatCrossDayTime(event.startMillis, event.endMillis, today),
                         style = MaterialTheme.typography.bodyMedium,
                         color = timeStyleColor,
                     )
@@ -364,6 +375,28 @@ private fun EmptyToday(modifier: Modifier = Modifier) {
 private fun formatTime(millis: Long): String =
     Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).toLocalTime()
         .let { "%02d:%02d".format(it.hour, it.minute) }
+
+// если событие началось не сегодня - добавляем "вчера"/"завтра" к краю
+internal fun formatCrossDayTime(
+    startMillis: Long,
+    endMillis: Long,
+    today: LocalDate,
+    zone: ZoneId = ZoneId.systemDefault(),
+): String {
+    val s = Instant.ofEpochMilli(startMillis).atZone(zone)
+    val e = Instant.ofEpochMilli(endMillis).atZone(zone)
+    val left = dayLabel(s.toLocalDate(), today, "%02d:%02d".format(s.hour, s.minute))
+    val right = dayLabel(e.toLocalDate(), today, "%02d:%02d".format(e.hour, e.minute))
+    return "$left - $right"
+}
+
+private fun dayLabel(date: LocalDate, today: LocalDate, time: String): String = when (date) {
+    today -> time
+    today.minusDays(1) -> "вчера $time"
+    today.plusDays(1) -> "завтра $time"
+    // длинные события на несколько дней - редкий случай, печатаем дату
+    else -> date.format(DateTimeFormatter.ofPattern("d MMM", Locale("ru"))) + " $time"
+}
 
 private fun todayHeader(): String {
     val date = LocalDate.now()

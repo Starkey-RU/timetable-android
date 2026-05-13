@@ -68,13 +68,17 @@ class EventEditorViewModel(
         val f = _form.value
         if (f.title.isBlank()) return
         viewModelScope.launch {
+            val startMillis = f.date.atTime(f.start).atZone(zone).toInstant().toEpochMilli()
+            // если конец раньше или равен старту - значит событие через полночь, кидаем конец на след день
+            val endDate = if (f.end > f.start) f.date else f.date.plusDays(1)
+            val endMillis = endDate.atTime(f.end).atZone(zone).toInstant().toEpochMilli()
             val entity = EventEntity(
                 id = eventId ?: 0,
                 title = f.title.trim(),
                 location = f.location.trim(),
                 colorKey = f.colorKey,
-                startMillis = f.date.atTime(f.start).atZone(zone).toInstant().toEpochMilli(),
-                endMillis = f.date.atTime(f.end).atZone(zone).toInstant().toEpochMilli(),
+                startMillis = startMillis,
+                endMillis = endMillis,
             )
             repo.add(entity)
             onDone()
