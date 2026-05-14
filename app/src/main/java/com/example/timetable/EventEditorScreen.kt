@@ -18,11 +18,14 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -132,6 +135,13 @@ fun EventEditorScreen(eventId: Long?, onClose: () -> Unit) {
                     onClick = { showEndPicker = true },
                     modifier = Modifier.weight(1f),
                 )
+            }
+
+            Text("Повтор", style = MaterialTheme.typography.labelLarge)
+            WeekdayChips(mask = form.recurrenceMask, onToggle = vm::toggleDay)
+            if (form.recurrenceMask != 0) {
+                // выбор чёт/нечёт нужен только когда хоть один день отмечен
+                ParityRadioRow(parity = form.weekParity, onPick = vm::setParity)
             }
 
             Box(modifier = Modifier.weight(1f))
@@ -275,6 +285,49 @@ private fun ColorChip(
                 contentDescription = "выбрано",
                 tint = Color.White,
             )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun WeekdayChips(mask: Int, onToggle: (Int) -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        WeekDays.all.forEachIndexed { idx, bit ->
+            val selected = (mask and bit) != 0
+            FilterChip(
+                selected = selected,
+                onClick = { onToggle(bit) },
+                label = { Text(WeekDays.labels[idx]) },
+                modifier = Modifier.weight(1f),
+                colors = FilterChipDefaults.filterChipColors(),
+            )
+        }
+    }
+}
+
+@Composable
+private fun ParityRadioRow(parity: Int, onPick: (Int) -> Unit) {
+    val items = listOf(
+        WeekParity.ALL to "Каждую неделю",
+        WeekParity.EVEN to "Чётные",
+        WeekParity.ODD to "Нечётные",
+    )
+    Column {
+        items.forEach { (value, label) ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onPick(value) }
+                    .padding(vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                RadioButton(selected = parity == value, onClick = { onPick(value) })
+                Text(text = label, style = MaterialTheme.typography.bodyMedium)
+            }
         }
     }
 }

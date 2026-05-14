@@ -20,6 +20,8 @@ data class EditorForm(
     val start: LocalTime = LocalTime.of(9, 0),
     val end: LocalTime = LocalTime.of(10, 0),
     val date: LocalDate = LocalDate.now(),
+    val recurrenceMask: Int = 0,
+    val weekParity: Int = WeekParity.ALL,
 )
 
 class EventEditorViewModel(
@@ -52,6 +54,8 @@ class EventEditorViewModel(
                     start = ev.startMillis.toLocalTime(),
                     end = ev.endMillis.toLocalTime(),
                     date = ev.startMillis.toLocalDate(),
+                    recurrenceMask = ev.recurrenceMask,
+                    weekParity = ev.weekParity,
                 )
             }
         }
@@ -63,6 +67,13 @@ class EventEditorViewModel(
     fun setStart(time: LocalTime) { _form.value = _form.value.copy(start = time) }
     fun setEnd(time: LocalTime) { _form.value = _form.value.copy(end = time) }
     fun setDate(date: LocalDate) { _form.value = _form.value.copy(date = date) }
+
+    fun toggleDay(bit: Int) {
+        val cur = _form.value.recurrenceMask
+        _form.value = _form.value.copy(recurrenceMask = cur xor bit)
+    }
+
+    fun setParity(parity: Int) { _form.value = _form.value.copy(weekParity = parity) }
 
     fun save(onDone: () -> Unit) {
         val f = _form.value
@@ -79,6 +90,8 @@ class EventEditorViewModel(
                 colorKey = f.colorKey,
                 startMillis = startMillis,
                 endMillis = endMillis,
+                recurrenceMask = f.recurrenceMask,
+                weekParity = f.weekParity,
             )
             repo.add(entity)
             onDone()

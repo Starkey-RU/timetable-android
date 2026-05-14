@@ -11,7 +11,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import java.time.LocalDate
+import java.time.Instant
 import java.time.ZoneId
 
 data class TodayState(
@@ -26,11 +26,17 @@ class TodayViewModel(private val repo: EventRepository) : ViewModel() {
 
     private val zone = ZoneId.systemDefault()
 
+    // observeAll вместо observeInRange - повторяющиеся хранятся как один шаблон,
+    // экземпляры на сегодня собираем сами через expandRecurrence
     val state: StateFlow<TodayState> = combine(
-        repo.observeInRange(startOfToday(), startOfTomorrow()),
+        repo.observeAll(),
         nowTicker(),
-    ) { events, nowMillis ->
-        groupForToday(events, nowMillis)
+    ) { all, nowMillis ->
+        val today = Instant.ofEpochMilli(nowMillis).atZone(zone).toLocalDate()
+        val from = today.atStartOfDay(zone).toInstant().toEpochMilli()
+        val to = today.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
+        val occurrences = all.flatMap { expandRecurrence(it, from, to, zone) }
+        groupForToday(occurrences, nowMillis)
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
@@ -40,12 +46,6 @@ class TodayViewModel(private val repo: EventRepository) : ViewModel() {
     fun delete(id: Long) {
         viewModelScope.launch { repo.deleteById(id) }
     }
-
-    private fun startOfToday(): Long =
-        LocalDate.now(zone).atStartOfDay(zone).toInstant().toEpochMilli()
-
-    private fun startOfTomorrow(): Long =
-        LocalDate.now(zone).plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
 
     // тикаем раз в минуту чтоб карточка "сейчас" не зависла
     private fun nowTicker() = flow {

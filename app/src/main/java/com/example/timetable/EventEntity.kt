@@ -12,4 +12,8 @@ data class EventEntity(
     val iconKey: String = "event",
     val startMillis: Long,
     val endMillis: Long,
+    // битовая маска дней недели: бит 0 = пн, ..., бит 6 = вс. 0 = одиночное событие.
+    val recurrenceMask: Int = 0,
+    // 0 = все недели, 1 = только чётные, 2 = только нечётные
+    val weekParity: Int = 0,
 )
