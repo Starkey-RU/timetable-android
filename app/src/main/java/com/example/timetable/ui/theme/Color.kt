@@ -44,15 +44,3 @@ val OutlineDark = Color(0xFF899392)
 val MyErrorDark = Color(0xFFFFB4AB)
 val OnMyErrorDark = Color(0xFF690005)
 
-// акценты на потом, пары и концы градиентов
-val WarmOrange = Color(0xFFFF6F3C)
-val WarmBeige = Color(0xFFF5EBDC)
-val AmberYellow = Color(0xFFFBA002)
-val DeepOlive = Color(0xFF313B2F)
-
-val WineRed = Color(0xFF95122C)
-val NearBlack = Color(0xFF100C08)
-val GradientOrange = Color(0xFFFF6B00)
-val CrimsonRed = Color(0xFFE8003A)
-val Gold = Color(0xFFFFD700)
-val OrangeRed = Color(0xFFFF4500)

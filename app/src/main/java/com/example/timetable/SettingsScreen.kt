@@ -28,13 +28,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import android.widget.Toast
+import kotlinx.coroutines.launch
 
 @Composable
 fun SettingsScreen() {
@@ -43,6 +47,9 @@ fun SettingsScreen() {
     val palette by AppPrefs.palette
     val gradient by AppPrefs.gradient
     val theme by AppPrefs.theme
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val repo = remember { (context.applicationContext as TimetableApplication).eventRepository }
 
     LazyColumn(
         modifier = Modifier.fillMaxWidth(),
@@ -96,7 +103,12 @@ fun SettingsScreen() {
         item { HorizontalDivider() }
         item {
             Button(
-                onClick = { /* потом */ },
+                onClick = {
+                    scope.launch {
+                        val n = repo.seedTestData()
+                        Toast.makeText(context, "Добавлено $n событий", Toast.LENGTH_SHORT).show()
+                    }
+                },
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text("Заполнить тестовыми данными")

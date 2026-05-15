@@ -32,11 +32,7 @@ class TodayViewModel(private val repo: EventRepository) : ViewModel() {
         repo.observeAll(),
         nowTicker(),
     ) { all, nowMillis ->
-        val today = Instant.ofEpochMilli(nowMillis).atZone(zone).toLocalDate()
-        val from = today.atStartOfDay(zone).toInstant().toEpochMilli()
-        val to = today.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
-        val occurrences = all.flatMap { expandRecurrence(it, from, to, zone) }
-        groupForToday(occurrences, nowMillis)
+        composeToday(all, nowMillis, zone)
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
@@ -60,6 +56,19 @@ class TodayViewModel(private val repo: EventRepository) : ViewModel() {
             initializer { TodayViewModel(repo) }
         }
     }
+}
+
+// собирает Today из всего списка событий: повторяющиеся разворачиваем, потом группируем
+internal fun composeToday(
+    all: List<EventEntity>,
+    nowMillis: Long,
+    zone: ZoneId,
+): TodayState {
+    val today = Instant.ofEpochMilli(nowMillis).atZone(zone).toLocalDate()
+    val from = today.atStartOfDay(zone).toInstant().toEpochMilli()
+    val to = today.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
+    val occurrences = all.flatMap { expandRecurrence(it, from, to, zone) }
+    return groupForToday(occurrences, nowMillis)
 }
 
 internal fun groupForToday(events: List<EventEntity>, nowMillis: Long): TodayState {
