@@ -9,17 +9,18 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -46,6 +47,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.collectAsState
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -88,10 +90,12 @@ fun EventEditorScreen(eventId: Long?, onClose: () -> Unit) {
             )
         },
     ) { inner ->
+        val scrollState = rememberScrollState()
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(inner)
+                .verticalScroll(scrollState)
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
@@ -143,8 +147,6 @@ fun EventEditorScreen(eventId: Long?, onClose: () -> Unit) {
                 // выбор чёт/нечёт нужен только когда хоть один день отмечен
                 ParityRadioRow(parity = form.weekParity, onPick = vm::setParity)
             }
-
-            Box(modifier = Modifier.weight(1f))
 
             Button(
                 onClick = { vm.save(onClose) },
@@ -289,7 +291,6 @@ private fun ColorChip(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun WeekdayChips(mask: Int, onToggle: (Int) -> Unit) {
     Row(
@@ -298,14 +299,46 @@ private fun WeekdayChips(mask: Int, onToggle: (Int) -> Unit) {
     ) {
         WeekDays.all.forEachIndexed { idx, bit ->
             val selected = (mask and bit) != 0
-            FilterChip(
+            WeekdayChip(
+                text = WeekDays.labels[idx],
                 selected = selected,
                 onClick = { onToggle(bit) },
-                label = { Text(WeekDays.labels[idx]) },
                 modifier = Modifier.weight(1f),
-                colors = FilterChipDefaults.filterChipColors(),
             )
         }
+    }
+}
+
+// свой компактный чип - material FilterChip с минимальным touch target 48dp
+// не лезет на узких экранах в одну строку, поэтому делаем плоский Box
+@Composable
+private fun WeekdayChip(
+    text: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val shape = RoundedCornerShape(17.dp)
+    val bg = if (selected) MaterialTheme.colorScheme.primary
+        else MaterialTheme.colorScheme.surfaceContainerLow
+    val fg = if (selected) MaterialTheme.colorScheme.onPrimary
+        else MaterialTheme.colorScheme.onSurfaceVariant
+    Box(
+        modifier = modifier
+            .height(34.dp)
+            .clip(shape)
+            .background(bg)
+            .border(1.dp, MaterialTheme.colorScheme.outline, shape)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelMedium,
+            color = fg,
+            maxLines = 1,
+            overflow = TextOverflow.Clip,
+        )
     }
 }
 

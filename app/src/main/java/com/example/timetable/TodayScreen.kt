@@ -2,6 +2,7 @@ package com.example.timetable
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -27,6 +28,8 @@ import androidx.compose.material.icons.filled.Book
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.FitnessCenter
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Laptop
 import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material3.Card
@@ -47,6 +50,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -79,6 +83,9 @@ fun TodayScreen(onEventClick: (Long) -> Unit = {}) {
         if (state.nowMillis == 0L) LocalDate.now()
         else Instant.ofEpochMilli(state.nowMillis).atZone(ZoneId.systemDefault()).toLocalDate()
     }
+
+    // секция "позже сегодня" может быть длинной, по умолчанию сворачиваем
+    var laterExpanded by rememberSaveable { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -136,14 +143,23 @@ fun TodayScreen(onEventClick: (Long) -> Unit = {}) {
                 }
             }
             if (state.later.isNotEmpty()) {
-                item("later-h") { SectionHeader("Позже сегодня", state.later.size) }
-                items(state.later, key = { "later-${it.id}" }) { ev ->
-                    EventCard(
-                        event = ev,
-                        today = today,
-                        onClick = { onEventClick(ev.id) },
-                        onLongClick = { pickedForActions = ev },
+                item("later-h") {
+                    SectionHeader(
+                        title = "Позже сегодня",
+                        count = state.later.size,
+                        expanded = laterExpanded,
+                        onClick = { laterExpanded = !laterExpanded },
                     )
+                }
+                if (laterExpanded) {
+                    items(state.later, key = { "later-${it.id}" }) { ev ->
+                        EventCard(
+                            event = ev,
+                            today = today,
+                            onClick = { onEventClick(ev.id) },
+                            onLongClick = { pickedForActions = ev },
+                        )
+                    }
                 }
             }
             if (state.done.isNotEmpty()) {
@@ -339,13 +355,17 @@ private fun iconFor(key: String): ImageVector = when (key) {
 }
 
 @Composable
-private fun SectionHeader(title: String, count: Int) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 16.dp, bottom = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
+private fun SectionHeader(
+    title: String,
+    count: Int,
+    expanded: Boolean? = null,
+    onClick: (() -> Unit)? = null,
+) {
+    val rowMod = Modifier
+        .fillMaxWidth()
+        .let { if (onClick != null) it.clickable(onClick = onClick) else it }
+        .padding(top = 16.dp, bottom = 4.dp)
+    Row(modifier = rowMod, verticalAlignment = Alignment.CenterVertically) {
         Text(
             text = title.uppercase(Locale.getDefault()),
             style = MaterialTheme.typography.labelMedium,
@@ -358,6 +378,14 @@ private fun SectionHeader(title: String, count: Int) {
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        if (expanded != null) {
+            Spacer(modifier = Modifier.width(4.dp))
+            Icon(
+                imageVector = if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 
