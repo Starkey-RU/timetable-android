@@ -17,13 +17,17 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -37,8 +41,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.widget.Toast
 import kotlinx.coroutines.launch
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 
 @Composable
 fun SettingsScreen() {
@@ -50,6 +59,11 @@ fun SettingsScreen() {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val repo = remember { (context.applicationContext as TimetableApplication).eventRepository }
+
+    // диалоги для шаринга/импорта через буфер
+    var showShare by remember { mutableStateOf(false) }
+    var shareText by remember { mutableStateOf("") }
+    var showImport by remember { mutableStateOf(false) }
 
     LazyColumn(
         modifier = Modifier.fillMaxWidth(),
@@ -101,6 +115,31 @@ fun SettingsScreen() {
         }
 
         item { HorizontalDivider() }
+        item { SectionTitle("Поделиться") }
+        item {
+            Button(
+                onClick = {
+                    scope.launch {
+                        val bundle = repo.exportAll()
+                        shareText = Json.encodeToString(bundle)
+                        showShare = true
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("Скопировать расписание")
+            }
+        }
+        item {
+            OutlinedButton(
+                onClick = { showImport = true },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("Импортировать из текста")
+            }
+        }
+
+        item { HorizontalDivider() }
         item {
             Button(
                 onClick = {
@@ -115,6 +154,104 @@ fun SettingsScreen() {
             }
         }
     }
+
+    if (showShare) {
+        ShareDialog(
+            text = shareText,
+            onCopy = {
+                val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                cm.setPrimaryClip(ClipData.newPlainText("расписание", shareText))
+                Toast.makeText(context, "Скопировано в буфер", Toast.LENGTH_SHORT).show()
+                showShare = false
+            },
+            onDismiss = { showShare = false },
+        )
+    }
+
+    if (showImport) {
+        ImportDialog(
+            onDismiss = { showImport = false },
+            onImport = { input ->
+                scope.launch {
+                    try {
+                        val bundle = Json.decodeFromString<ExportBundle>(input)
+                        val n = repo.importEvents(bundle)
+                        Toast.makeText(context, "Добавлено $n событий", Toast.LENGTH_SHORT).show()
+                        showImport = false
+                    } catch (e: Exception) {
+                        Toast.makeText(context, "Не получилось разобрать текст", Toast.LENGTH_LONG).show()
+                    }
+                }
+            },
+        )
+    }
+}
+
+@Composable
+private fun ShareDialog(text: String, onCopy: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Расписание текстом") },
+        text = {
+            Column {
+                Text(
+                    text = "Скопируй или жми кнопку - получится длинный JSON, его можно отправить хоть в чат, хоть в почту.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = {},
+                    readOnly = true,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(220.dp)
+                        .padding(top = 8.dp),
+                    textStyle = MaterialTheme.typography.bodySmall,
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onCopy) { Text("Скопировать") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Закрыть") }
+        },
+    )
+}
+
+@Composable
+private fun ImportDialog(onDismiss: () -> Unit, onImport: (String) -> Unit) {
+    var input by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Импорт из текста") },
+        text = {
+            Column {
+                Text(
+                    text = "Вставь сюда расписание, которое тебе прислали.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                OutlinedTextField(
+                    value = input,
+                    onValueChange = { input = it },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(220.dp)
+                        .padding(top = 8.dp),
+                    textStyle = MaterialTheme.typography.bodySmall,
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = input.isNotBlank(),
+                onClick = { onImport(input) },
+            ) { Text("Импортировать") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Отмена") }
+        },
+    )
 }
 
 @Composable

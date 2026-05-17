@@ -1,6 +1,7 @@
 package com.example.timetable
 
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
@@ -21,6 +22,18 @@ class EventRepository(private val dao: EventDao) {
     suspend fun delete(event: EventEntity) = dao.delete(event)
 
     suspend fun deleteById(id: Long) = dao.deleteById(id)
+
+    // выгрузка всех событий в формат для шаринга через буфер обмена
+    suspend fun exportAll(): ExportBundle {
+        val all = dao.observeAll().first()
+        return ExportBundle(events = all.map { it.toDto() })
+    }
+
+    // добавляет всё что пришло как новые события (не обновляет существующие)
+    suspend fun importEvents(bundle: ExportBundle): Int {
+        bundle.events.forEach { dao.insert(it.toEntity()) }
+        return bundle.events.size
+    }
 
     // забивает базу тестовыми событиями для демонстрации.
     // ~4 одиночных в день за +/-14 дней + пара повторяющихся шаблонов = 120+ записей.
