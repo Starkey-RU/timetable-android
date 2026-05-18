@@ -10,5 +10,6 @@ class TimetableApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         AppPrefs.init(this)
+        PinManager.init(this)
     }
 }

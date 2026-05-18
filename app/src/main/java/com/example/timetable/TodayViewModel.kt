@@ -40,6 +40,7 @@ class TodayViewModel(private val repo: EventRepository) : ViewModel() {
     )
 
     fun delete(id: Long) {
+        if (AppPrefs.isGuest.value) return
         viewModelScope.launch { repo.deleteById(id) }
     }
 

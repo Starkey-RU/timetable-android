@@ -50,15 +50,22 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
 @Composable
-fun SettingsScreen() {
-    var guestMode by remember { mutableStateOf(false) }
-    var pinEnabled by remember { mutableStateOf(false) }
+fun SettingsScreen(
+    onOpenReports: () -> Unit = {},
+    onOpenPinSetup: () -> Unit = {},
+) {
     val palette by AppPrefs.palette
     val gradient by AppPrefs.gradient
     val theme by AppPrefs.theme
+    val guestMode by AppPrefs.isGuest
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val repo = remember { (context.applicationContext as TimetableApplication).eventRepository }
+
+    // тик чтоб перечитать isPinSet после clear, при возврате с setup compose сам перерисует
+    var pinChangedTick by remember { mutableStateOf(0) }
+    @Suppress("UNUSED_EXPRESSION") pinChangedTick
+    val pinEnabled = PinManager.isPinSet()
 
     // диалоги для шаринга/импорта через буфер
     var showShare by remember { mutableStateOf(false) }
@@ -102,7 +109,7 @@ fun SettingsScreen() {
                 title = "Гостевой режим",
                 subtitle = "только просмотр, без правок",
                 checked = guestMode,
-                onCheckedChange = { guestMode = it },
+                onCheckedChange = { AppPrefs.isGuest.value = it },
             )
         }
         item {
@@ -110,8 +117,25 @@ fun SettingsScreen() {
                 title = "PIN-код",
                 subtitle = "запрос пин-кода при запуске",
                 checked = pinEnabled,
-                onCheckedChange = { pinEnabled = it },
+                onCheckedChange = { enable ->
+                    if (enable) {
+                        onOpenPinSetup()
+                    } else {
+                        PinManager.clear()
+                        pinChangedTick++
+                    }
+                },
             )
+        }
+        item { HorizontalDivider() }
+        item { SectionTitle("Информация") }
+        item {
+            OutlinedButton(
+                onClick = onOpenReports,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("Отчёты")
+            }
         }
 
         item { HorizontalDivider() }
@@ -133,6 +157,7 @@ fun SettingsScreen() {
         item {
             OutlinedButton(
                 onClick = { showImport = true },
+                enabled = !guestMode,
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text("Импортировать из текста")
@@ -148,6 +173,7 @@ fun SettingsScreen() {
                         Toast.makeText(context, "Добавлено $n событий", Toast.LENGTH_SHORT).show()
                     }
                 },
+                enabled = !guestMode,
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text("Заполнить тестовыми данными")

@@ -78,6 +78,8 @@ class EventEditorViewModel(
     fun save(onDone: () -> Unit) {
         val f = _form.value
         if (f.title.isBlank()) return
+        // подстраховка: если как-то нажали Сохранить при гостевом режиме - молча выходим
+        if (AppPrefs.isGuest.value) { onDone(); return }
         viewModelScope.launch {
             val startMillis = f.date.atTime(f.start).atZone(zone).toInstant().toEpochMilli()
             // если конец раньше или равен старту - значит событие через полночь, кидаем конец на след день
@@ -100,6 +102,7 @@ class EventEditorViewModel(
 
     fun delete(onDone: () -> Unit) {
         val id = eventId ?: return
+        if (AppPrefs.isGuest.value) { onDone(); return }
         viewModelScope.launch {
             repo.deleteById(id)
             onDone()

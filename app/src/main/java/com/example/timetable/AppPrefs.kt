@@ -23,12 +23,14 @@ object AppPrefs {
     val gradient: MutableState<GradientPreset> = mutableStateOf(GradientPreset.WineBlack)
     val theme: MutableState<ThemeMode> = mutableStateOf(ThemeMode.Auto)
     val showNavLabels: MutableState<Boolean> = mutableStateOf(true)
+    val isGuest: MutableState<Boolean> = mutableStateOf(false)
 
     private const val FILE = "app_prefs"
     private const val K_PALETTE = "palette"
     private const val K_GRADIENT = "gradient"
     private const val K_THEME = "theme"
     private const val K_NAV_LABELS = "nav_labels"
+    private const val K_GUEST = "guest"
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -38,12 +40,14 @@ object AppPrefs {
         gradient.value = readEnum(prefs, K_GRADIENT, GradientPreset.entries) ?: GradientPreset.WineBlack
         theme.value = readEnum(prefs, K_THEME, ThemeMode.entries) ?: ThemeMode.Auto
         showNavLabels.value = prefs.getBoolean(K_NAV_LABELS, true)
+        isGuest.value = prefs.getBoolean(K_GUEST, false)
 
         // подписываемся на изменения и пишем назад. drop(1) чтоб не записать стартовое значение
         scope.launch { snapshotFlow { palette.value }.drop(1).collect { write(prefs, K_PALETTE, it.name) } }
         scope.launch { snapshotFlow { gradient.value }.drop(1).collect { write(prefs, K_GRADIENT, it.name) } }
         scope.launch { snapshotFlow { theme.value }.drop(1).collect { write(prefs, K_THEME, it.name) } }
         scope.launch { snapshotFlow { showNavLabels.value }.drop(1).collect { writeBool(prefs, K_NAV_LABELS, it) } }
+        scope.launch { snapshotFlow { isGuest.value }.drop(1).collect { writeBool(prefs, K_GUEST, it) } }
     }
 
     private fun <E : Enum<E>> readEnum(prefs: SharedPreferences, key: String, values: List<E>): E? {

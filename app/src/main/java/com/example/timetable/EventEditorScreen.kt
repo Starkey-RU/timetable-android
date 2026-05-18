@@ -68,6 +68,7 @@ fun EventEditorScreen(eventId: Long?, onClose: () -> Unit) {
     )
     val form by vm.form.collectAsState()
     val notFound by vm.notFound.collectAsState()
+    val isGuest by AppPrefs.isGuest
 
     // если событие удалили пока редактор грузился - просто выходим
     LaunchedEffect(notFound) {
@@ -150,7 +151,7 @@ fun EventEditorScreen(eventId: Long?, onClose: () -> Unit) {
 
             Button(
                 onClick = { vm.save(onClose) },
-                enabled = form.title.isNotBlank(),
+                enabled = form.title.isNotBlank() && !isGuest,
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text("Сохранить")
@@ -159,10 +160,19 @@ fun EventEditorScreen(eventId: Long?, onClose: () -> Unit) {
             if (vm.isEditing) {
                 OutlinedButton(
                     onClick = { vm.delete(onClose) },
+                    enabled = !isGuest,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Text("Удалить")
                 }
+            }
+
+            if (isGuest) {
+                Text(
+                    text = "Гостевой режим - только просмотр. Чтобы менять, выключи в настройках.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
     }

@@ -45,11 +45,12 @@ fun AppScaffold() {
     val currentRoute = backStack?.destination?.route
     val isTab = Tab.entries.any { it.route == currentRoute }
     val showNavLabels by AppPrefs.showNavLabels
+    val isGuest by AppPrefs.isGuest
 
     Scaffold(
         floatingActionButton = {
-            // фаб только на табах, в редакторе он не нужен
-            if (isTab) {
+            // фаб только на табах, в редакторе он не нужен. в гостевом режиме тоже прячем - нечего создавать
+            if (isTab && !isGuest) {
                 FloatingActionButton(onClick = { nav.navigate("$EDITOR_ROUTE?$EDITOR_ID_ARG=$NEW_EVENT_ID") }) {
                     Icon(Icons.Filled.Add, contentDescription = "Добавить")
                 }
@@ -114,7 +115,12 @@ fun AppScaffold() {
                     icon = Icons.Filled.Description,
                 )
             }
-            composable(Tab.Settings.route) { SettingsScreen() }
+            composable(Tab.Settings.route) {
+                SettingsScreen(
+                    onOpenReports = { nav.navigate("reports") },
+                    onOpenPinSetup = { nav.navigate("pin_setup") },
+                )
+            }
             composable(
                 route = "$EDITOR_ROUTE?$EDITOR_ID_ARG={$EDITOR_ID_ARG}",
                 arguments = listOf(
@@ -128,6 +134,15 @@ fun AppScaffold() {
                 EventEditorScreen(
                     eventId = id.takeIf { it != NEW_EVENT_ID },
                     onClose = { nav.popBackStack() },
+                )
+            }
+            composable("reports") {
+                ReportsScreen(onClose = { nav.popBackStack() })
+            }
+            composable("pin_setup") {
+                PinSetupScreen(
+                    onDone = { nav.popBackStack() },
+                    onCancel = { nav.popBackStack() },
                 )
             }
         }

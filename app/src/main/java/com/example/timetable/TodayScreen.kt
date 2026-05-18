@@ -74,9 +74,12 @@ fun TodayScreen(onEventClick: (Long) -> Unit = {}) {
     val app = LocalContext.current.applicationContext as TimetableApplication
     val vm: TodayViewModel = viewModel(factory = remember { TodayViewModel.factory(app.eventRepository) })
     val state by vm.state.collectAsState()
+    val isGuest by AppPrefs.isGuest
 
-    // событие, по которому долго нажали - показываем шторку с действиями
+    // событие, по которому долго нажали - показываем шторку с действиями.
+    // в гостевом режиме шторку не открываем, удалять всё равно нельзя
     var pickedForActions by remember { mutableStateOf<EventEntity?>(null) }
+    val handleLongClick: (EventEntity) -> Unit = { ev -> if (!isGuest) pickedForActions = ev }
 
     // одна "сегодняшняя" дата на весь экран чтоб карточки не ушли в разные дни
     val today = remember(state.nowMillis) {
@@ -127,7 +130,7 @@ fun TodayScreen(onEventClick: (Long) -> Unit = {}) {
                         emphasized = true,
                         nowMillis = state.nowMillis,
                         onClick = { onEventClick(ev.id) },
-                        onLongClick = { pickedForActions = ev },
+                        onLongClick = { handleLongClick(ev) },
                     )
                 }
             }
@@ -138,7 +141,7 @@ fun TodayScreen(onEventClick: (Long) -> Unit = {}) {
                         today = today,
                         badge = "Дальше",
                         onClick = { onEventClick(ev.id) },
-                        onLongClick = { pickedForActions = ev },
+                        onLongClick = { handleLongClick(ev) },
                     )
                 }
             }
@@ -157,7 +160,7 @@ fun TodayScreen(onEventClick: (Long) -> Unit = {}) {
                             event = ev,
                             today = today,
                             onClick = { onEventClick(ev.id) },
-                            onLongClick = { pickedForActions = ev },
+                            onLongClick = { handleLongClick(ev) },
                         )
                     }
                 }
@@ -170,7 +173,7 @@ fun TodayScreen(onEventClick: (Long) -> Unit = {}) {
                         today = today,
                         completed = true,
                         onClick = { onEventClick(ev.id) },
-                        onLongClick = { pickedForActions = ev },
+                        onLongClick = { handleLongClick(ev) },
                     )
                 }
             }
