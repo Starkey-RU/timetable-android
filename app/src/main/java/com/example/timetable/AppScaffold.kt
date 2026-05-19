@@ -138,11 +138,9 @@ fun AppScaffold(widthSize: WindowWidthSizeClass = WindowWidthSizeClass.Compact) 
                 WeekScreen()
             }
             composable(Tab.Schedules.route) {
-                EmptyScreen(
-                    title = "Расписания",
-                    subtitle = "сохранённые расписания и пресеты появятся здесь",
-                    icon = Icons.Filled.Description,
-                )
+                SchedulesScreen(onEventClick = { id ->
+                    nav.navigate("$EDITOR_ROUTE?$EDITOR_ID_ARG=$id")
+                })
             }
             composable(Tab.Settings.route) {
                 SettingsScreen(
