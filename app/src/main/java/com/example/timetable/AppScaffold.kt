@@ -17,9 +17,12 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationRail
+import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalDivider
+import androidx.navigation.NavHostController
 import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -58,6 +61,7 @@ fun AppScaffold(widthSize: WindowWidthSizeClass = WindowWidthSizeClass.Compact) 
     val isTab = Tab.entries.any { it.route == currentRoute }
     val showNavLabels by AppPrefs.showNavLabels
     val isGuest by AppPrefs.isGuest
+    val sideRailPref by AppPrefs.useSideRail
 
     // на широком экране (планшет / разложенный foldable) показываем сегодня + редактор рядом.
     // -1L означает "панель закрыта", -2L "новое событие" (просто чтоб не плодить sealed class)
@@ -65,7 +69,18 @@ fun AppScaffold(widthSize: WindowWidthSizeClass = WindowWidthSizeClass.Compact) 
     var twoPaneSelected by rememberSaveable { mutableStateOf<Long>(-1L) }
     val openInPane: (Long) -> Unit = { id -> twoPaneSelected = id }
 
-    Scaffold(
+    // на широком экране и если в настройках включено - меню слева вертикально, иначе снизу
+    val useRail = isWide && sideRailPref
+
+    Row(modifier = Modifier.fillMaxSize()) {
+        if (useRail && isTab) {
+            AppNavRail(
+                currentRoute = currentRoute,
+                showLabels = showNavLabels,
+                onPick = { route -> navigateToTab(nav, route) },
+            )
+        }
+        Scaffold(
         floatingActionButton = {
             // фаб только на табах, в редакторе он не нужен. в гостевом режиме тоже прячем - нечего создавать
             if (isTab && !isGuest) {
@@ -82,19 +97,13 @@ fun AppScaffold(widthSize: WindowWidthSizeClass = WindowWidthSizeClass.Compact) 
             }
         },
         bottomBar = {
-            if (isTab) {
+            // если rail включён - снизу панели нет, оставляем только редкие случаи (compact или выкл)
+            if (isTab && !useRail) {
                 NavigationBar {
                     Tab.entries.forEach { tab ->
                         NavigationBarItem(
                             selected = currentRoute == tab.route,
-                            onClick = {
-                                nav.navigate(tab.route) {
-                                    // чтоб стек не рос если кликать туда-сюда
-                                    popUpTo(Tab.Today.route) { saveState = true }
-                                    launchSingleTop = true
-                                    restoreState = true
-                                }
-                            },
+                            onClick = { navigateToTab(nav, tab.route) },
                             icon = { Icon(tab.icon, contentDescription = tab.label) },
                             label = if (showNavLabels) {
                                 {
@@ -172,6 +181,44 @@ fun AppScaffold(widthSize: WindowWidthSizeClass = WindowWidthSizeClass.Compact) 
                     onCancel = { nav.popBackStack() },
                 )
             }
+        }
+    }
+    } // конец Row
+}
+
+// дёргается из обоих вариантов меню (нижнего и бокового) - чтоб не дублировать опции
+private fun navigateToTab(nav: NavHostController, route: String) {
+    nav.navigate(route) {
+        // чтоб стек не рос если кликать туда-сюда
+        popUpTo(Tab.Today.route) { saveState = true }
+        launchSingleTop = true
+        restoreState = true
+    }
+}
+
+@Composable
+private fun AppNavRail(
+    currentRoute: String?,
+    showLabels: Boolean,
+    onPick: (String) -> Unit,
+) {
+    NavigationRail {
+        Tab.entries.forEach { tab ->
+            NavigationRailItem(
+                selected = currentRoute == tab.route,
+                onClick = { onPick(tab.route) },
+                icon = { Icon(tab.icon, contentDescription = tab.label) },
+                label = if (showLabels) {
+                    {
+                        Text(
+                            text = tab.label,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            style = MaterialTheme.typography.labelSmall,
+                        )
+                    }
+                } else null,
+            )
         }
     }
 }

@@ -22,6 +22,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.Book
@@ -77,6 +79,8 @@ fun TodayScreen(onEventClick: (Long) -> Unit = {}) {
     val vm: TodayViewModel = viewModel(factory = remember { TodayViewModel.factory(app.eventRepository) })
     val state by vm.state.collectAsState()
     val isGuest by AppPrefs.isGuest
+    val showGradient by AppPrefs.showGradientHeader
+    val gradient by AppPrefs.gradient
 
     // событие, по которому долго нажали - показываем шторку с действиями.
     // в гостевом режиме шторку не открываем, удалять всё равно нельзя
@@ -94,21 +98,25 @@ fun TodayScreen(onEventClick: (Long) -> Unit = {}) {
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text("Сегодня", style = MaterialTheme.typography.titleLarge)
-                        Text(
-                            text = todayHeader(),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                ),
-            )
+            if (showGradient) {
+                GradientHeader(brush = gradient.brush, dateLine = todayHeader())
+            } else {
+                TopAppBar(
+                    title = {
+                        Column {
+                            Text("Сегодня", style = MaterialTheme.typography.titleLarge)
+                            Text(
+                                text = todayHeader(),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surface,
+                    ),
+                )
+            }
         },
     ) { inner ->
         if (state.now.isEmpty() && state.next == null && state.later.isEmpty() && state.done.isEmpty()) {
@@ -389,6 +397,33 @@ private fun SectionHeader(
                 imageVector = if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun GradientHeader(brush: Brush, dateLine: String) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 8.dp)
+            .clip(RoundedCornerShape(24.dp))
+            .background(brush)
+            .padding(horizontal = 20.dp, vertical = 18.dp),
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        Column {
+            Text(
+                text = "Сегодня",
+                color = Color.White,
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = dateLine,
+                color = Color.White.copy(alpha = 0.85f),
+                style = MaterialTheme.typography.labelLarge,
             )
         }
     }

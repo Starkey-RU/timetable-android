@@ -23,6 +23,20 @@ class TimetableApplication : Application() {
         PinManager.init(this)
         NotificationScheduler.ensureChannel(this)
 
+        // чистим прошедшие разовые события при старте, если в настройках включено
+        scope.launch {
+            runCatching { eventRepository.purgePastSingles(AppPrefs.autoDeleteDays.value) }
+        }
+
+        // и потом - на каждое изменение настройки тоже прогоняем
+        scope.launch {
+            snapshotFlow { AppPrefs.autoDeleteDays.value }
+                .distinctUntilChanged()
+                .collect { days ->
+                    runCatching { eventRepository.purgePastSingles(days) }
+                }
+        }
+
         // подписываемся на список событий и на тоггл уведомлений - при любом изменении перепланируем
         scope.launch {
             combine(

@@ -23,6 +23,15 @@ class EventRepository(private val dao: EventDao) {
 
     suspend fun deleteById(id: Long) = dao.deleteById(id)
 
+    // чистит разовые события, у которых конец был раньше чем daysOld дней назад.
+    // повторяющиеся не трогаем - они продолжают создавать вхождения вперёд.
+    // если daysOld <= 0 - выключено, ничего не делаем.
+    suspend fun purgePastSingles(daysOld: Int, nowMillis: Long = System.currentTimeMillis()): Int {
+        if (daysOld <= 0) return 0
+        val cutoff = nowMillis - daysOld * 24L * 60L * 60L * 1000L
+        return dao.deleteSinglePastBefore(cutoff)
+    }
+
     // выгрузка всех событий в формат для шаринга через буфер обмена
     suspend fun exportAll(): ExportBundle {
         val all = dao.observeAll().first()

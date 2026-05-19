@@ -26,6 +26,15 @@ object AppPrefs {
     val isGuest: MutableState<Boolean> = mutableStateOf(false)
     val notificationsEnabled: MutableState<Boolean> = mutableStateOf(false)
 
+    // 0 = не удалять, иначе через сколько дней после конца события его можно стереть
+    val autoDeleteDays: MutableState<Int> = mutableStateOf(0)
+
+    // на широком экране (планшет/foldable) показывать nav слева вертикально
+    val useSideRail: MutableState<Boolean> = mutableStateOf(true)
+
+    // цветной градиентный заголовок на экране сегодня
+    val showGradientHeader: MutableState<Boolean> = mutableStateOf(true)
+
     private const val FILE = "app_prefs"
     private const val K_PALETTE = "palette"
     private const val K_GRADIENT = "gradient"
@@ -33,6 +42,9 @@ object AppPrefs {
     private const val K_NAV_LABELS = "nav_labels"
     private const val K_GUEST = "guest"
     private const val K_NOTIF = "notifications"
+    private const val K_AUTODEL = "auto_delete_days"
+    private const val K_SIDE_RAIL = "side_rail"
+    private const val K_GRAD_HDR = "gradient_header"
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -44,6 +56,9 @@ object AppPrefs {
         showNavLabels.value = prefs.getBoolean(K_NAV_LABELS, true)
         isGuest.value = prefs.getBoolean(K_GUEST, false)
         notificationsEnabled.value = prefs.getBoolean(K_NOTIF, false)
+        autoDeleteDays.value = prefs.getInt(K_AUTODEL, 0)
+        useSideRail.value = prefs.getBoolean(K_SIDE_RAIL, true)
+        showGradientHeader.value = prefs.getBoolean(K_GRAD_HDR, true)
 
         // подписываемся на изменения и пишем назад. drop(1) чтоб не записать стартовое значение
         scope.launch { snapshotFlow { palette.value }.drop(1).collect { write(prefs, K_PALETTE, it.name) } }
@@ -52,6 +67,9 @@ object AppPrefs {
         scope.launch { snapshotFlow { showNavLabels.value }.drop(1).collect { writeBool(prefs, K_NAV_LABELS, it) } }
         scope.launch { snapshotFlow { isGuest.value }.drop(1).collect { writeBool(prefs, K_GUEST, it) } }
         scope.launch { snapshotFlow { notificationsEnabled.value }.drop(1).collect { writeBool(prefs, K_NOTIF, it) } }
+        scope.launch { snapshotFlow { autoDeleteDays.value }.drop(1).collect { writeInt(prefs, K_AUTODEL, it) } }
+        scope.launch { snapshotFlow { useSideRail.value }.drop(1).collect { writeBool(prefs, K_SIDE_RAIL, it) } }
+        scope.launch { snapshotFlow { showGradientHeader.value }.drop(1).collect { writeBool(prefs, K_GRAD_HDR, it) } }
     }
 
     private fun <E : Enum<E>> readEnum(prefs: SharedPreferences, key: String, values: List<E>): E? {
@@ -65,5 +83,9 @@ object AppPrefs {
 
     private fun writeBool(prefs: SharedPreferences, key: String, value: Boolean) {
         prefs.edit().putBoolean(key, value).apply()
+    }
+
+    private fun writeInt(prefs: SharedPreferences, key: String, value: Int) {
+        prefs.edit().putInt(key, value).apply()
     }
 }

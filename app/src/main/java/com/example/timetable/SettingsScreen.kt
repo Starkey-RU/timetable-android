@@ -102,12 +102,21 @@ fun SettingsScreen(
 
         item { SectionTitle("Палитра") }
         item {
-            PaletteChips(selected = palette, onPick = { AppPrefs.palette.value = it })
+            PaletteButton(current = palette, onPick = { AppPrefs.palette.value = it })
         }
 
         item { SectionTitle("Градиент") }
         item {
             GradientChips(selected = gradient, onPick = { AppPrefs.gradient.value = it })
+        }
+        item {
+            val showGrad by AppPrefs.showGradientHeader
+            SwitchRow(
+                title = "Цветной заголовок",
+                subtitle = "градиент сверху на экране сегодня",
+                checked = showGrad,
+                onCheckedChange = { AppPrefs.showGradientHeader.value = it },
+            )
         }
 
         item { SectionTitle("Внешний вид") }
@@ -119,6 +128,19 @@ fun SettingsScreen(
                 checked = showLabels,
                 onCheckedChange = { AppPrefs.showNavLabels.value = it },
             )
+        }
+        item {
+            val sideRail by AppPrefs.useSideRail
+            SwitchRow(
+                title = "Боковое меню",
+                subtitle = "на широком экране и foldable - меню слева вертикально",
+                checked = sideRail,
+                onCheckedChange = { AppPrefs.useSideRail.value = it },
+            )
+        }
+        item {
+            val days by AppPrefs.autoDeleteDays
+            AutoDeleteRow(currentDays = days, onPick = { AppPrefs.autoDeleteDays.value = it })
         }
 
         item { SectionTitle("Доступ") }
@@ -383,54 +405,159 @@ private fun ThemeSelector(current: ThemeMode, onPick: (ThemeMode) -> Unit) {
     }
 }
 
+// кнопка-карточка с текущей палитрой, по клику открывает диалог-выбор
 @Composable
-private fun PaletteChips(selected: Palette, onPick: (Palette) -> Unit) {
+private fun PaletteButton(current: Palette, onPick: (Palette) -> Unit) {
+    var open by remember { mutableStateOf(false) }
     Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(14.dp))
+            .clickable { open = true }
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Palette.entries.forEach { p ->
-            PaletteChip(
-                palette = p,
-                isSelected = p == selected,
-                onClick = { onPick(p) },
-                modifier = Modifier.weight(1f),
+        Box(
+            modifier = Modifier
+                .size(28.dp)
+                .clip(CircleShape)
+                .background(current.primary),
+        )
+        Column(modifier = Modifier.weight(1f).padding(start = 14.dp)) {
+            Text(text = "Палитра", style = MaterialTheme.typography.bodyLarge)
+            Text(
+                text = current.title,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+        Text(
+            text = "Сменить",
+            color = MaterialTheme.colorScheme.primary,
+            style = MaterialTheme.typography.labelLarge,
+        )
+    }
+    if (open) {
+        PalettePickerDialog(
+            current = current,
+            onPick = {
+                onPick(it)
+                open = false
+            },
+            onDismiss = { open = false },
+        )
     }
 }
 
 @Composable
-private fun PaletteChip(
-    palette: Palette,
-    isSelected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
+private fun PalettePickerDialog(
+    current: Palette,
+    onPick: (Palette) -> Unit,
+    onDismiss: () -> Unit,
 ) {
-    val outline = if (isSelected) MaterialTheme.colorScheme.onSurface else Color.Transparent
-    Column(
-        modifier = modifier
-            .clip(RoundedCornerShape(14.dp))
-            .border(2.dp, outline, RoundedCornerShape(14.dp))
-            .clickable(onClick = onClick)
-            .padding(8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Box(
-            modifier = Modifier
-                .size(40.dp)
-                .clip(CircleShape)
-                .background(palette.primary),
-            contentAlignment = Alignment.Center,
-        ) {
-            if (isSelected) {
-                Icon(Icons.Filled.Check, contentDescription = null, tint = Color.White)
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Палитра") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Palette.entries.forEach { p ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable { onPick(p) }
+                            .padding(horizontal = 8.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(28.dp)
+                                .clip(CircleShape)
+                                .background(p.primary),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            if (p == current) {
+                                Icon(Icons.Filled.Check, contentDescription = null, tint = Color.White)
+                            }
+                        }
+                        Text(
+                            text = p.title,
+                            modifier = Modifier.padding(start = 14.dp),
+                            style = MaterialTheme.typography.bodyLarge,
+                        )
+                    }
+                }
             }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Закрыть") }
+        },
+    )
+}
+
+// 0 = выкл, остальное - сколько дней после конца события его можно стереть
+private val autoDeletePresets = listOf(0, 1, 7, 30, 90)
+
+private fun autoDeleteLabel(days: Int): String = when (days) {
+    0 -> "никогда"
+    1 -> "через 1 день"
+    else -> "через $days дней"
+}
+
+@Composable
+private fun AutoDeleteRow(currentDays: Int, onPick: (Int) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { open = true }
+            .padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = "Удалять прошедшие", style = MaterialTheme.typography.bodyLarge)
+            Text(
+                text = "разовые события, которые уже прошли",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
         Text(
-            text = palette.title,
-            style = MaterialTheme.typography.labelMedium,
-            modifier = Modifier.padding(top = 6.dp),
+            text = autoDeleteLabel(currentDays),
+            color = MaterialTheme.colorScheme.primary,
+            style = MaterialTheme.typography.labelLarge,
+        )
+    }
+    if (open) {
+        AlertDialog(
+            onDismissRequest = { open = false },
+            title = { Text("Удалять прошедшие") },
+            text = {
+                Column {
+                    autoDeletePresets.forEach { d ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    onPick(d)
+                                    open = false
+                                }
+                                .padding(vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            RadioButton(selected = d == currentDays, onClick = {
+                                onPick(d)
+                                open = false
+                            })
+                            Text(text = autoDeleteLabel(d), style = MaterialTheme.typography.bodyLarge)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { open = false }) { Text("Закрыть") }
+            },
         )
     }
 }
