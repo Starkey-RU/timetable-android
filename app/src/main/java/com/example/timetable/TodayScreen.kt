@@ -60,7 +60,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.example.timetable.ui.theme.TimetableTheme
 import androidx.lifecycle.viewmodel.compose.viewModel
 import java.time.Instant
 import java.time.LocalDate
@@ -433,5 +435,27 @@ private fun todayHeader(): String {
     val date = LocalDate.now()
     val fmt = DateTimeFormatter.ofPattern("EEEE, d MMMM", Locale("ru"))
     return date.format(fmt).replaceFirstChar { it.titlecase(Locale("ru")) }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Preview(name = "Карточка события", showBackground = true)
+@Composable
+private fun EventCardPreview() {
+    val today = LocalDate.of(2026, 5, 24)
+    val zone = ZoneId.systemDefault()
+    val start = today.atTime(10, 0).atZone(zone).toInstant().toEpochMilli()
+    val end = today.atTime(11, 30).atZone(zone).toInstant().toEpochMilli()
+    val event = EventEntity(
+        id = 1,
+        title = "Лекция по матанализу",
+        location = "Ауд. 312",
+        colorKey = "indigo",
+        iconKey = "book",
+        startMillis = start,
+        endMillis = end,
+    )
+    TimetableTheme {
+        EventCard(event = event, today = today)
+    }
 }
 

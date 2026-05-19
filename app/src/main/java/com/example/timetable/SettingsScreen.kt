@@ -40,11 +40,19 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.example.timetable.ui.theme.TimetableTheme
+import android.Manifest
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import kotlinx.coroutines.launch
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -58,9 +66,19 @@ fun SettingsScreen(
     val gradient by AppPrefs.gradient
     val theme by AppPrefs.theme
     val guestMode by AppPrefs.isGuest
+    val notificationsOn by AppPrefs.notificationsEnabled
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val repo = remember { (context.applicationContext as TimetableApplication).eventRepository }
+
+    // запрос разрешения POST_NOTIFICATIONS, нужен только на 13+
+    val notifPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) {
+            AppPrefs.notificationsEnabled.value = true
+        } else {
+            Toast.makeText(context, "Без разрешения уведомления не придут", Toast.LENGTH_LONG).show()
+        }
+    }
 
     // тик чтоб перечитать isPinSet после clear, при возврате с setup compose сам перерисует
     var pinChangedTick by remember { mutableStateOf(0) }
@@ -114,6 +132,30 @@ fun SettingsScreen(
         }
         item {
             SwitchRow(
+                title = "Уведомления",
+                subtitle = "напомнить за 10 минут до начала",
+                checked = notificationsOn,
+                onCheckedChange = { enable ->
+                    if (!enable) {
+                        AppPrefs.notificationsEnabled.value = false
+                        return@SwitchRow
+                    }
+                    // на 13+ просим рантайм-разрешение, иначе уведомления молча не покажутся
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        val granted = ContextCompat.checkSelfPermission(
+                            context,
+                            Manifest.permission.POST_NOTIFICATIONS,
+                        ) == PackageManager.PERMISSION_GRANTED
+                        if (granted) AppPrefs.notificationsEnabled.value = true
+                        else notifPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    } else {
+                        AppPrefs.notificationsEnabled.value = true
+                    }
+                },
+            )
+        }
+        item {
+            SwitchRow(
                 title = "PIN-код",
                 subtitle = "запрос пин-кода при запуске",
                 checked = pinEnabled,
@@ -151,7 +193,21 @@ fun SettingsScreen(
                 },
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text("Скопировать расписание")
+                Text("Скопировать как JSON")
+            }
+        }
+        item {
+            OutlinedButton(
+                onClick = {
+                    scope.launch {
+                        val events = repo.exportAll().events.map { it.toEntity() }
+                        shareText = IcsExport.build(events)
+                        showShare = true
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("Скопировать как .ics (для календарей)")
             }
         }
         item {
@@ -435,5 +491,20 @@ private fun SwitchRow(
             )
         }
         Switch(checked = checked, onCheckedChange = onCheckedChange)
+    }
+}
+
+@Preview(name = "Строка-переключатель", showBackground = true)
+@Composable
+private fun SwitchRowPreview() {
+    TimetableTheme {
+        Column(modifier = Modifier.padding(16.dp)) {
+            SwitchRow(
+                title = "Гостевой режим",
+                subtitle = "только просмотр, без правок",
+                checked = true,
+                onCheckedChange = {},
+            )
+        }
     }
 }

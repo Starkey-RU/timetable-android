@@ -135,11 +135,7 @@ fun AppScaffold(widthSize: WindowWidthSizeClass = WindowWidthSizeClass.Compact) 
                 }
             }
             composable(Tab.Week.route) {
-                EmptyScreen(
-                    title = "Неделя",
-                    subtitle = "недельный календарь появится здесь",
-                    icon = Icons.Filled.CalendarToday,
-                )
+                WeekScreen()
             }
             composable(Tab.Schedules.route) {
                 EmptyScreen(
