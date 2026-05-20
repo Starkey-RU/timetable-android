@@ -2,6 +2,7 @@ package com.example.timetable
 
 import android.app.Application
 import androidx.compose.runtime.snapshotFlow
+import androidx.glance.appwidget.updateAll
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -31,6 +32,13 @@ class TimetableApplication : Application() {
                 .collect { events ->
                     NotificationScheduler.reschedule(this@TimetableApplication, events)
                 }
+        }
+
+        // дёргаем виджет на главном экране чтоб обновился когда события поменялись
+        scope.launch {
+            eventRepository.observeAll().collect {
+                runCatching { TodayWidget().updateAll(this@TimetableApplication) }
+            }
         }
     }
 }
