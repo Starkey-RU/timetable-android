@@ -3,6 +3,7 @@ package com.example.timetable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -62,6 +63,9 @@ fun AppScaffold(widthSize: WindowWidthSizeClass = WindowWidthSizeClass.Compact) 
     val showNavLabels by AppPrefs.showNavLabels
     val isGuest by AppPrefs.isGuest
     val sideRailPref by AppPrefs.useSideRail
+    val railOnRight by AppPrefs.navRailOnRight
+    val railCentered by AppPrefs.navRailCentered
+    val swapPanes by AppPrefs.swapTwoPanePanels
 
     // на широком экране (планшет / разложенный foldable) показываем сегодня + редактор рядом.
     // -1L означает "панель закрыта", -2L "новое событие" (просто чтоб не плодить sealed class)
@@ -73,14 +77,18 @@ fun AppScaffold(widthSize: WindowWidthSizeClass = WindowWidthSizeClass.Compact) 
     val useRail = isWide && sideRailPref
 
     Row(modifier = Modifier.fillMaxSize()) {
-        if (useRail && isTab) {
+        // меню можно поставить справа от контента - тогда сначала рисуем Scaffold, потом rail
+        if (useRail && isTab && !railOnRight) {
             AppNavRail(
                 currentRoute = currentRoute,
                 showLabels = showNavLabels,
+                centered = railCentered,
                 onPick = { route -> navigateToTab(nav, route) },
             )
         }
         Scaffold(
+        // в режиме с боковым меню Scaffold берёт остаток ширины, иначе занимает всё сам
+        modifier = if (useRail && isTab) Modifier.weight(1f) else Modifier,
         floatingActionButton = {
             // фаб только на табах, в редакторе он не нужен. в гостевом режиме тоже прячем - нечего создавать
             if (isTab && !isGuest) {
@@ -136,6 +144,7 @@ fun AppScaffold(widthSize: WindowWidthSizeClass = WindowWidthSizeClass.Compact) 
                         selected = twoPaneSelected,
                         onSelect = openInPane,
                         onClose = { twoPaneSelected = -1L },
+                        swapped = swapPanes,
                     )
                 } else {
                     TodayScreen(onEventClick = { id ->
@@ -155,6 +164,7 @@ fun AppScaffold(widthSize: WindowWidthSizeClass = WindowWidthSizeClass.Compact) 
                 SettingsScreen(
                     onOpenReports = { nav.navigate("reports") },
                     onOpenPinSetup = { nav.navigate("pin_setup") },
+                    onOpenFoldableSettings = { nav.navigate("foldable_settings") },
                 )
             }
             composable(
@@ -181,8 +191,19 @@ fun AppScaffold(widthSize: WindowWidthSizeClass = WindowWidthSizeClass.Compact) 
                     onCancel = { nav.popBackStack() },
                 )
             }
+            composable("foldable_settings") {
+                FoldableSettingsScreen(onClose = { nav.popBackStack() })
+            }
         }
     }
+        if (useRail && isTab && railOnRight) {
+            AppNavRail(
+                currentRoute = currentRoute,
+                showLabels = showNavLabels,
+                centered = railCentered,
+                onPick = { route -> navigateToTab(nav, route) },
+            )
+        }
     } // конец Row
 }
 
@@ -200,9 +221,13 @@ private fun navigateToTab(nav: NavHostController, route: String) {
 private fun AppNavRail(
     currentRoute: String?,
     showLabels: Boolean,
+    centered: Boolean,
     onPick: (String) -> Unit,
 ) {
+    // NavigationRail сам по себе не умеет центрировать пункты по вертикали,
+    // поэтому когда нужно - оборачиваем элементы в Column со spacer'ами по краям
     NavigationRail {
+        if (centered) Spacer(modifier = Modifier.weight(1f))
         Tab.entries.forEach { tab ->
             NavigationRailItem(
                 selected = currentRoute == tab.route,
@@ -220,28 +245,41 @@ private fun AppNavRail(
                 } else null,
             )
         }
+        if (centered) Spacer(modifier = Modifier.weight(1f))
     }
 }
 
 // двухпанельный режим "сегодня": список слева, редактор справа.
 // видно только на широком экране - планшет либо разложенный foldable.
+// swapped = true меняет панели местами (редактор слева, список справа)
 @Composable
 private fun TodayTwoPane(
     selected: Long,
     onSelect: (Long) -> Unit,
     onClose: () -> Unit,
+    swapped: Boolean,
 ) {
-    Row(modifier = Modifier.fillMaxSize()) {
-        Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
+    val list: @Composable () -> Unit = {
+        Box(modifier = Modifier.fillMaxHeight()) {
             TodayScreen(onEventClick = onSelect)
         }
-        VerticalDivider()
-        Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
+    }
+    val editor: @Composable () -> Unit = {
+        Box(modifier = Modifier.fillMaxHeight()) {
             when (selected) {
                 -1L -> TwoPanePlaceholder()
                 -2L -> EventEditorScreen(eventId = null, onClose = onClose)
                 else -> EventEditorScreen(eventId = selected, onClose = onClose)
             }
+        }
+    }
+    Row(modifier = Modifier.fillMaxSize()) {
+        Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
+            if (swapped) editor() else list()
+        }
+        VerticalDivider()
+        Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
+            if (swapped) list() else editor()
         }
     }
 }

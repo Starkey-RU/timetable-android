@@ -95,6 +95,9 @@ fun TodayScreen(onEventClick: (Long) -> Unit = {}) {
 
     // секция "позже сегодня" может быть длинной, по умолчанию сворачиваем
     var laterExpanded by rememberSaveable { mutableStateOf(false) }
+    // секция "завершено" - то же самое, но стартовое состояние из настроек
+    val collapseDoneByDefault by AppPrefs.collapseDoneByDefault
+    var doneExpanded by rememberSaveable { mutableStateOf(!collapseDoneByDefault) }
 
     Scaffold(
         topBar = {
@@ -176,15 +179,24 @@ fun TodayScreen(onEventClick: (Long) -> Unit = {}) {
                 }
             }
             if (state.done.isNotEmpty()) {
-                item("done-h") { SectionHeader("Завершено", state.done.size) }
-                items(state.done, key = { "done-${it.id}" }) { ev ->
-                    EventCard(
-                        event = ev,
-                        today = today,
-                        completed = true,
-                        onClick = { onEventClick(ev.id) },
-                        onLongClick = { handleLongClick(ev) },
+                item("done-h") {
+                    SectionHeader(
+                        title = "Завершено",
+                        count = state.done.size,
+                        expanded = doneExpanded,
+                        onClick = { doneExpanded = !doneExpanded },
                     )
+                }
+                if (doneExpanded) {
+                    items(state.done, key = { "done-${it.id}" }) { ev ->
+                        EventCard(
+                            event = ev,
+                            today = today,
+                            completed = true,
+                            onClick = { onEventClick(ev.id) },
+                            onLongClick = { handleLongClick(ev) },
+                        )
+                    }
                 }
             }
         }

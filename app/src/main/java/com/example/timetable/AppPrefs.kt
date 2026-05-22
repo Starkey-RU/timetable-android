@@ -35,6 +35,17 @@ object AppPrefs {
     // цветной градиентный заголовок на экране сегодня
     val showGradientHeader: MutableState<Boolean> = mutableStateOf(true)
 
+    // настройки для широких экранов / foldable.
+    // боковое меню по умолчанию слева, можно перекинуть направо.
+    val navRailOnRight: MutableState<Boolean> = mutableStateOf(false)
+    // в двухпанельном виде по умолчанию список слева, редактор справа - можно поменять
+    val swapTwoPanePanels: MutableState<Boolean> = mutableStateOf(false)
+    // пункты бокового меню прижать к центру по вертикали (по умолчанию сверху)
+    val navRailCentered: MutableState<Boolean> = mutableStateOf(false)
+
+    // сворачивать секцию "завершено" на экране сегодня по умолчанию
+    val collapseDoneByDefault: MutableState<Boolean> = mutableStateOf(true)
+
     private const val FILE = "app_prefs"
     private const val K_PALETTE = "palette"
     private const val K_GRADIENT = "gradient"
@@ -45,6 +56,10 @@ object AppPrefs {
     private const val K_AUTODEL = "auto_delete_days"
     private const val K_SIDE_RAIL = "side_rail"
     private const val K_GRAD_HDR = "gradient_header"
+    private const val K_RAIL_RIGHT = "rail_right"
+    private const val K_SWAP_PANES = "swap_panes"
+    private const val K_RAIL_CENTER = "rail_center"
+    private const val K_COLLAPSE_DONE = "collapse_done"
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -59,6 +74,10 @@ object AppPrefs {
         autoDeleteDays.value = prefs.getInt(K_AUTODEL, 0)
         useSideRail.value = prefs.getBoolean(K_SIDE_RAIL, true)
         showGradientHeader.value = prefs.getBoolean(K_GRAD_HDR, true)
+        navRailOnRight.value = prefs.getBoolean(K_RAIL_RIGHT, false)
+        swapTwoPanePanels.value = prefs.getBoolean(K_SWAP_PANES, false)
+        navRailCentered.value = prefs.getBoolean(K_RAIL_CENTER, false)
+        collapseDoneByDefault.value = prefs.getBoolean(K_COLLAPSE_DONE, true)
 
         // подписываемся на изменения и пишем назад. drop(1) чтоб не записать стартовое значение
         scope.launch { snapshotFlow { palette.value }.drop(1).collect { write(prefs, K_PALETTE, it.name) } }
@@ -70,6 +89,10 @@ object AppPrefs {
         scope.launch { snapshotFlow { autoDeleteDays.value }.drop(1).collect { writeInt(prefs, K_AUTODEL, it) } }
         scope.launch { snapshotFlow { useSideRail.value }.drop(1).collect { writeBool(prefs, K_SIDE_RAIL, it) } }
         scope.launch { snapshotFlow { showGradientHeader.value }.drop(1).collect { writeBool(prefs, K_GRAD_HDR, it) } }
+        scope.launch { snapshotFlow { navRailOnRight.value }.drop(1).collect { writeBool(prefs, K_RAIL_RIGHT, it) } }
+        scope.launch { snapshotFlow { swapTwoPanePanels.value }.drop(1).collect { writeBool(prefs, K_SWAP_PANES, it) } }
+        scope.launch { snapshotFlow { navRailCentered.value }.drop(1).collect { writeBool(prefs, K_RAIL_CENTER, it) } }
+        scope.launch { snapshotFlow { collapseDoneByDefault.value }.drop(1).collect { writeBool(prefs, K_COLLAPSE_DONE, it) } }
     }
 
     private fun <E : Enum<E>> readEnum(prefs: SharedPreferences, key: String, values: List<E>): E? {

@@ -61,6 +61,7 @@ import kotlinx.serialization.json.Json
 fun SettingsScreen(
     onOpenReports: () -> Unit = {},
     onOpenPinSetup: () -> Unit = {},
+    onOpenFoldableSettings: () -> Unit = {},
 ) {
     val palette by AppPrefs.palette
     val gradient by AppPrefs.gradient
@@ -130,13 +131,21 @@ fun SettingsScreen(
             )
         }
         item {
-            val sideRail by AppPrefs.useSideRail
+            val collapseDone by AppPrefs.collapseDoneByDefault
             SwitchRow(
-                title = "Боковое меню",
-                subtitle = "на широком экране и foldable - меню слева вертикально",
-                checked = sideRail,
-                onCheckedChange = { AppPrefs.useSideRail.value = it },
+                title = "Сворачивать прошедшие",
+                subtitle = "блок завершённых сегодня по умолчанию свёрнут",
+                checked = collapseDone,
+                onCheckedChange = { AppPrefs.collapseDoneByDefault.value = it },
             )
+        }
+        item {
+            OutlinedButton(
+                onClick = onOpenFoldableSettings,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("Для широкого экрана")
+            }
         }
         item {
             val days by AppPrefs.autoDeleteDays
