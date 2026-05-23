@@ -40,7 +40,7 @@ fun ReportsScreen(onClose: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Отчёты") },
+                title = { Text("ВКР: отчёты") },
                 navigationIcon = {
                     IconButton(onClick = onClose) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")
@@ -69,6 +69,13 @@ fun ReportsScreen(onClose: () -> Unit) {
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            item {
+                Text(
+                    text = "ВКР: ДЕМОНСТРАЦИОННАЯ СТАТИСТИКА",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             item { StatCard("Всего событий", total.toString()) }
             item { StatCard("С повторами", recurring.toString()) }
 

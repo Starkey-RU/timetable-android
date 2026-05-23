@@ -9,6 +9,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -26,6 +27,11 @@ fun PinLockScreen(onUnlock: () -> Unit) {
     var pin by remember { mutableStateOf("") }
     var wrong by remember { mutableStateOf(false) }
 
+    // без Surface фон будет дефолтный белый - в тёмной теме экран ввода вырубал глаза
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background,
+    ) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -71,5 +77,6 @@ fun PinLockScreen(onUnlock: () -> Unit) {
         ) {
             Text("Войти")
         }
+    }
     }
 }

@@ -106,9 +106,8 @@ fun SettingsScreen(
             PaletteButton(current = palette, onPick = { AppPrefs.palette.value = it })
         }
 
-        item { SectionTitle("Градиент") }
         item {
-            GradientChips(selected = gradient, onPick = { AppPrefs.gradient.value = it })
+            GradientButton(current = gradient, onPick = { AppPrefs.gradient.value = it })
         }
         item {
             val showGrad by AppPrefs.showGradientHeader
@@ -124,8 +123,8 @@ fun SettingsScreen(
         item {
             val showLabels by AppPrefs.showNavLabels
             SwitchRow(
-                title = "Подписи в нижней панели",
-                subtitle = "если выключить - останутся только иконки",
+                title = "Подписи у пунктов меню",
+                subtitle = "если выключить - в навигации останутся только иконки",
                 checked = showLabels,
                 onCheckedChange = { AppPrefs.showNavLabels.value = it },
             )
@@ -207,7 +206,7 @@ fun SettingsScreen(
                 onClick = onOpenReports,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text("Отчёты")
+                Text("Отчёты (ВКР)")
             }
         }
 
@@ -218,13 +217,29 @@ fun SettingsScreen(
                 onClick = {
                     scope.launch {
                         val bundle = repo.exportAll()
+                        val json = Json.encodeToString(bundle)
+                        // упаковываем чтоб не вываливать на собеседника километр текста
+                        shareText = TextCompress.pack(json)
+                        showShare = true
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("Скопировать (сжатый текст)")
+            }
+        }
+        item {
+            OutlinedButton(
+                onClick = {
+                    scope.launch {
+                        val bundle = repo.exportAll()
                         shareText = Json.encodeToString(bundle)
                         showShare = true
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text("Скопировать как JSON")
+                Text("Скопировать как обычный JSON")
             }
         }
         item {
@@ -287,7 +302,11 @@ fun SettingsScreen(
             onImport = { input ->
                 scope.launch {
                     try {
-                        val bundle = Json.decodeFromString<ExportBundle>(input)
+                        // если строка начинается с { - думаем что это сырой JSON.
+                        // иначе пробуем разжать (наш сжатый формат)
+                        val raw = if (input.trimStart().startsWith("{")) input
+                                  else TextCompress.unpack(input)
+                        val bundle = Json.decodeFromString<ExportBundle>(raw)
                         val n = repo.importEvents(bundle)
                         Toast.makeText(context, "Добавлено $n событий", Toast.LENGTH_SHORT).show()
                         showImport = false
@@ -369,20 +388,21 @@ private fun ImportDialog(onDismiss: () -> Unit, onImport: (String) -> Unit) {
 
 @Composable
 private fun HeroBanner(gradient: GradientPreset) {
+    // компактная плашка-разделитель сверху, просто чтоб было видно текущий градиент
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(100.dp)
-            .clip(RoundedCornerShape(20.dp))
+            .height(56.dp)
+            .clip(RoundedCornerShape(14.dp))
             .background(gradient.brush)
-            .padding(20.dp),
-        contentAlignment = Alignment.BottomStart,
+            .padding(horizontal = 16.dp),
+        contentAlignment = Alignment.CenterStart,
     ) {
         Text(
             text = "Расписание",
             color = Color.White,
             fontWeight = FontWeight.SemiBold,
-            style = MaterialTheme.typography.titleLarge,
+            style = MaterialTheme.typography.titleMedium,
         )
     }
 }
@@ -398,17 +418,21 @@ private fun SectionTitle(text: String) {
 
 @Composable
 private fun ThemeSelector(current: ThemeMode, onPick: (ThemeMode) -> Unit) {
-    Column(modifier = Modifier.fillMaxWidth()) {
+    // три варианта в одну горизонтальную строку, чтоб не растягивать настройки на пол-экрана
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         ThemeMode.entries.forEach { mode ->
             Row(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { onPick(mode) }
-                    .padding(vertical = 4.dp),
+                    .weight(1f)
+                    .clickable { onPick(mode) },
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 RadioButton(selected = current == mode, onClick = { onPick(mode) })
-                Text(text = mode.title, style = MaterialTheme.typography.bodyLarge)
+                Text(text = mode.title, style = MaterialTheme.typography.bodyMedium)
             }
         }
     }
@@ -526,10 +550,13 @@ private fun AutoDeleteRow(currentDays: Int, onPick: (Int) -> Unit) {
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(text = "Удалять прошедшие", style = MaterialTheme.typography.bodyLarge)
+            // фиксированно две строки чтобы при смене пресета строка не прыгала по высоте
             Text(
-                text = "разовые события, которые уже прошли",
+                text = "разовые события, которые уже прошли\nповторяющиеся не трогаем",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                minLines = 2,
+                maxLines = 2,
             )
         }
         Text(
@@ -571,39 +598,85 @@ private fun AutoDeleteRow(currentDays: Int, onPick: (Int) -> Unit) {
     }
 }
 
+// одна строка-кнопка с превью текущего градиента, остальные варианты прячутся в диалог
 @Composable
-private fun GradientChips(selected: GradientPreset, onPick: (GradientPreset) -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        GradientPreset.entries.forEach { g ->
-            val outlineColor = if (g == selected) MaterialTheme.colorScheme.onSurface else Color.Transparent
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(64.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(g.brush)
-                    .border(2.dp, outlineColor, RoundedCornerShape(14.dp))
-                    .clickable { onPick(g) }
-                    .padding(horizontal = 16.dp),
-                contentAlignment = Alignment.CenterStart,
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (g == selected) {
-                        Icon(
-                            Icons.Filled.Check,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.padding(end = 8.dp),
-                        )
-                    }
-                    Text(
-                        text = g.title,
-                        color = Color.White,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                }
-            }
+private fun GradientButton(current: GradientPreset, onPick: (GradientPreset) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(14.dp))
+            .clickable { open = true }
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(current.brush),
+        )
+        Column(modifier = Modifier.weight(1f).padding(start = 14.dp)) {
+            Text(text = "Градиент", style = MaterialTheme.typography.bodyLarge)
+            Text(
+                text = current.title,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
+        Text(
+            text = "Сменить",
+            color = MaterialTheme.colorScheme.primary,
+            style = MaterialTheme.typography.labelLarge,
+        )
+    }
+    if (open) {
+        AlertDialog(
+            onDismissRequest = { open = false },
+            title = { Text("Градиент") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    GradientPreset.entries.forEach { g ->
+                        val outlineColor = if (g == current) MaterialTheme.colorScheme.onSurface
+                                           else Color.Transparent
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(52.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(g.brush)
+                                .border(2.dp, outlineColor, RoundedCornerShape(12.dp))
+                                .clickable {
+                                    onPick(g)
+                                    open = false
+                                }
+                                .padding(horizontal = 16.dp),
+                            contentAlignment = Alignment.CenterStart,
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (g == current) {
+                                    Icon(
+                                        Icons.Filled.Check,
+                                        contentDescription = null,
+                                        tint = Color.White,
+                                        modifier = Modifier.padding(end = 8.dp),
+                                    )
+                                }
+                                Text(
+                                    text = g.title,
+                                    color = Color.White,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { open = false }) { Text("Закрыть") }
+            },
+        )
     }
 }
 

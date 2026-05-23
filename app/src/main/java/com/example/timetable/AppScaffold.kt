@@ -3,6 +3,7 @@ package com.example.timetable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -12,12 +13,15 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.ViewWeek
+import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Scaffold
@@ -90,17 +94,43 @@ fun AppScaffold(widthSize: WindowWidthSizeClass = WindowWidthSizeClass.Compact) 
         // в режиме с боковым меню Scaffold берёт остаток ширины, иначе занимает всё сам
         modifier = if (useRail && isTab) Modifier.weight(1f) else Modifier,
         floatingActionButton = {
-            // фаб только на табах, в редакторе он не нужен. в гостевом режиме тоже прячем - нечего создавать
-            if (isTab && !isGuest) {
-                FloatingActionButton(onClick = {
-                    if (isWide && currentRoute == Tab.Today.route) {
-                        // в двухпанельном виде открываем новое событие справа, без отдельного экрана
-                        twoPaneSelected = -2L
-                    } else {
-                        nav.navigate("$EDITOR_ROUTE?$EDITOR_ID_ARG=$NEW_EVENT_ID")
+            // фаб только там, где есть смысл что-то добавлять: сегодня, неделя, расписания.
+            // на настройках и в гостевом режиме прячем
+            val canAdd = currentRoute == Tab.Today.route ||
+                currentRoute == Tab.Week.route ||
+                currentRoute == Tab.Schedules.route
+            // на широком экране в табе сегодня - дополнительная мини-кнопка swap панелей
+            val showSwap = isWide && currentRoute == Tab.Today.route
+            if (canAdd && !isGuest || showSwap) {
+                Column(horizontalAlignment = Alignment.End) {
+                    if (showSwap) {
+                        SmallFloatingActionButton(
+                            onClick = { AppPrefs.swapTwoPanePanels.value = !AppPrefs.swapTwoPanePanels.value },
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                        ) {
+                            Icon(Icons.Filled.SwapHoriz, contentDescription = "Поменять панели")
+                        }
+                        Spacer(modifier = Modifier.padding(top = 8.dp))
                     }
-                }) {
-                    Icon(Icons.Filled.Add, contentDescription = "Добавить")
+                    if (canAdd && !isGuest) {
+                        FloatingActionButton(
+                            onClick = {
+                                if (isWide && currentRoute == Tab.Today.route) {
+                                    // в двухпанельном виде открываем новое событие справа, без отдельного экрана
+                                    twoPaneSelected = -2L
+                                } else {
+                                    nav.navigate("$EDITOR_ROUTE?$EDITOR_ID_ARG=$NEW_EVENT_ID")
+                                }
+                            },
+                            // явно тянем primary из палитры - иначе FAB красится дефолтным primaryContainer,
+                            // а его мы в теме не подменяем под выбранную палитру
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary,
+                        ) {
+                            Icon(Icons.Filled.Add, contentDescription = "Добавить")
+                        }
+                    }
                 }
             }
         },
@@ -153,7 +183,18 @@ fun AppScaffold(widthSize: WindowWidthSizeClass = WindowWidthSizeClass.Compact) 
                 }
             }
             composable(Tab.Week.route) {
-                WeekScreen()
+                WeekScreen(onDayClick = { epochDay -> nav.navigate("day/$epochDay") })
+            }
+            composable(
+                route = "day/{day}",
+                arguments = listOf(navArgument("day") { type = NavType.LongType }),
+            ) { entry ->
+                val day = entry.arguments?.getLong("day") ?: 0L
+                DayScreen(
+                    initialEpochDay = day,
+                    onClose = { nav.popBackStack() },
+                    onEventClick = { id -> nav.navigate("$EDITOR_ROUTE?$EDITOR_ID_ARG=$id") },
+                )
             }
             composable(Tab.Schedules.route) {
                 SchedulesScreen(onEventClick = { id ->
@@ -225,8 +266,15 @@ private fun AppNavRail(
     onPick: (String) -> Unit,
 ) {
     // NavigationRail сам по себе не умеет центрировать пункты по вертикали,
-    // поэтому когда нужно - оборачиваем элементы в Column со spacer'ами по краям
-    NavigationRail {
+    // поэтому когда нужно - оборачиваем элементы в Column со spacer'ами по краям.
+    // в header'е - кнопка перекинуть rail на другую сторону, удобно для foldable.
+    NavigationRail(
+        header = {
+            IconButton(onClick = { AppPrefs.navRailOnRight.value = !AppPrefs.navRailOnRight.value }) {
+                Icon(Icons.Filled.SwapHoriz, contentDescription = "Меню на другую сторону")
+            }
+        },
+    ) {
         if (centered) Spacer(modifier = Modifier.weight(1f))
         Tab.entries.forEach { tab ->
             NavigationRailItem(

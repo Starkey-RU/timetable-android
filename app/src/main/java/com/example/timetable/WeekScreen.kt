@@ -1,6 +1,7 @@
 package com.example.timetable
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,12 +15,18 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -41,23 +48,39 @@ import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun WeekScreen() {
+fun WeekScreen(onDayClick: (Long) -> Unit = {}) {
     val app = LocalContext.current.applicationContext as TimetableApplication
     val vm: WeekViewModel = viewModel(factory = remember { WeekViewModel.factory(app.eventRepository) })
     val days by vm.days.collectAsState()
+    val offset by vm.weekOffset.collectAsState()
     val today = remember { LocalDate.now() }
+    val canPrev = offset > -WEEK_OFFSET_MAX
+    val canNext = offset < WEEK_OFFSET_MAX
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
                     Column {
-                        Text("Неделя", style = MaterialTheme.typography.titleLarge)
+                        Text(weekTitle(offset), style = MaterialTheme.typography.titleLarge)
                         Text(
                             text = weekHeader(days),
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                    }
+                },
+                actions = {
+                    IconButton(onClick = { vm.prevWeek() }, enabled = canPrev) {
+                        Icon(Icons.Filled.ChevronLeft, contentDescription = "Прошлая неделя")
+                    }
+                    if (offset != 0) {
+                        TextButton(onClick = { vm.resetWeek() }) {
+                            Text("Сегодня")
+                        }
+                    }
+                    IconButton(onClick = { vm.nextWeek() }, enabled = canNext) {
+                        Icon(Icons.Filled.ChevronRight, contentDescription = "Следующая неделя")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -74,21 +97,27 @@ fun WeekScreen() {
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             items(days, key = { it.date.toEpochDay() }) { bucket ->
-                WeekDayRow(bucket = bucket, isToday = bucket.date == today)
+                WeekDayRow(
+                    bucket = bucket,
+                    isToday = bucket.date == today,
+                    onClick = { onDayClick(bucket.date.toEpochDay()) },
+                )
             }
         }
     }
 }
 
 @Composable
-private fun WeekDayRow(bucket: DayBucket, isToday: Boolean) {
+private fun WeekDayRow(bucket: DayBucket, isToday: Boolean, onClick: () -> Unit = {}) {
     val container = if (isToday) MaterialTheme.colorScheme.primaryContainer
                     else MaterialTheme.colorScheme.surfaceContainerLow
     val onContainer = if (isToday) MaterialTheme.colorScheme.onPrimaryContainer
                       else MaterialTheme.colorScheme.onSurface
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = container),
     ) {
@@ -163,6 +192,15 @@ private fun eventsCountLabel(count: Int): String {
         else -> "событий"
     }
     return "$count $word"
+}
+
+// человеко-читаемый заголовок: текущая / прошлая / следующая / через 2 / N недель
+private fun weekTitle(offset: Int): String = when (offset) {
+    0 -> "Эта неделя"
+    -1 -> "Прошлая неделя"
+    1 -> "Следующая неделя"
+    in 2..Int.MAX_VALUE -> "Через $offset нед."
+    else -> "${-offset} нед. назад"
 }
 
 private fun weekHeader(days: List<DayBucket>): String {

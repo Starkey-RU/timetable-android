@@ -17,6 +17,7 @@ data class EditorForm(
     val title: String = "",
     val location: String = "",
     val colorKey: String = "indigo",
+    val iconKey: String = "event",
     val start: LocalTime = LocalTime.of(9, 0),
     val end: LocalTime = LocalTime.of(10, 0),
     val date: LocalDate = LocalDate.now(),
@@ -51,6 +52,7 @@ class EventEditorViewModel(
                     title = ev.title,
                     location = ev.location,
                     colorKey = ev.colorKey,
+                    iconKey = ev.iconKey,
                     start = ev.startMillis.toLocalTime(),
                     end = ev.endMillis.toLocalTime(),
                     date = ev.startMillis.toLocalDate(),
@@ -64,6 +66,7 @@ class EventEditorViewModel(
     fun setTitle(value: String) { _form.value = _form.value.copy(title = value) }
     fun setLocation(value: String) { _form.value = _form.value.copy(location = value) }
     fun setColor(key: String) { _form.value = _form.value.copy(colorKey = key) }
+    fun setIcon(key: String) { _form.value = _form.value.copy(iconKey = key) }
     fun setStart(time: LocalTime) { _form.value = _form.value.copy(start = time) }
     fun setEnd(time: LocalTime) { _form.value = _form.value.copy(end = time) }
     fun setDate(date: LocalDate) { _form.value = _form.value.copy(date = date) }
@@ -74,6 +77,10 @@ class EventEditorViewModel(
     }
 
     fun setParity(parity: Int) { _form.value = _form.value.copy(weekParity = parity) }
+
+    fun clearRecurrence() {
+        _form.value = _form.value.copy(recurrenceMask = 0, weekParity = WeekParity.ALL)
+    }
 
     fun save(onDone: () -> Unit) {
         val f = _form.value
@@ -90,6 +97,7 @@ class EventEditorViewModel(
                 title = f.title.trim(),
                 location = f.location.trim(),
                 colorKey = f.colorKey,
+                iconKey = f.iconKey,
                 startMillis = startMillis,
                 endMillis = endMillis,
                 recurrenceMask = f.recurrenceMask,

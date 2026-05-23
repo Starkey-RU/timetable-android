@@ -334,6 +334,9 @@ private fun EventCard(
                         val total = (event.endMillis - event.startMillis).coerceAtLeast(1)
                         val progress = ((nowMillis - event.startMillis).toFloat() / total).coerceIn(0f, 1f)
                         val leftMin = ((event.endMillis - nowMillis) / 60_000L).coerceAtLeast(0)
+                        // если событие переваливает через полночь - просто помечаем подписью под полоской
+                        val midnightMillis = nextMidnightMillis(event.startMillis)
+                        val crossesMidnight = midnightMillis in (event.startMillis + 1)..(event.endMillis - 1)
                         LinearProgressIndicator(
                             progress = { progress },
                             modifier = Modifier
@@ -346,6 +349,13 @@ private fun EventCard(
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                        if (crossesMidnight) {
+                            Text(
+                                text = "событие идёт через полночь",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
                 }
             }
@@ -362,21 +372,12 @@ private fun EventIconBubble(iconKey: String, tint: Color) {
         contentAlignment = Alignment.Center,
     ) {
         Icon(
-            imageVector = iconFor(iconKey),
+            imageVector = EventIcons.vector(iconKey),
             contentDescription = null,
             tint = tint,
             modifier = Modifier.size(20.dp),
         )
     }
-}
-
-private fun iconFor(key: String): ImageVector = when (key) {
-    "book"    -> Icons.Filled.Book
-    "food"    -> Icons.Filled.Restaurant
-    "laptop"  -> Icons.Filled.Laptop
-    "fitness" -> Icons.Filled.FitnessCenter
-    "chat"    -> Icons.AutoMirrored.Filled.Chat
-    else      -> Icons.Filled.Event
 }
 
 @Composable
@@ -450,6 +451,12 @@ private fun EmptyToday(modifier: Modifier = Modifier) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
+}
+
+// миллисекунды до ближайшей полуночи в локальной зоне
+private fun nextMidnightMillis(fromMillis: Long, zone: ZoneId = ZoneId.systemDefault()): Long {
+    val date = Instant.ofEpochMilli(fromMillis).atZone(zone).toLocalDate()
+    return date.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
 }
 
 private fun formatTime(millis: Long): String =

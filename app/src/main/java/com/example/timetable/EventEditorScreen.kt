@@ -63,7 +63,11 @@ import java.util.Locale
 @Composable
 fun EventEditorScreen(eventId: Long?, onClose: () -> Unit) {
     val app = LocalContext.current.applicationContext as TimetableApplication
+    // key обязателен - иначе в двухпанельном режиме при клике на разные события
+    // viewModel() вернёт тот же экземпляр (один ViewModelStoreOwner), и редактор покажет старые данные.
+    // null превращаем в строку чтоб "новое" и id=0 не конфликтовали
     val vm: EventEditorViewModel = viewModel(
+        key = "editor-${eventId ?: "new"}",
         factory = remember(eventId) { EventEditorViewModel.factory(app.eventRepository, eventId) },
     )
     val form by vm.form.collectAsState()
@@ -118,6 +122,9 @@ fun EventEditorScreen(eventId: Long?, onClose: () -> Unit) {
             Text("Цвет", style = MaterialTheme.typography.labelLarge)
             ColorChipsRow(selected = form.colorKey, onPick = vm::setColor)
 
+            Text("Иконка", style = MaterialTheme.typography.labelLarge)
+            IconChipsRow(selected = form.iconKey, onPick = vm::setIcon)
+
             DateField(
                 value = form.date,
                 onClick = { showDatePicker = true },
@@ -142,12 +149,13 @@ fun EventEditorScreen(eventId: Long?, onClose: () -> Unit) {
                 )
             }
 
-            Text("Повтор", style = MaterialTheme.typography.labelLarge)
-            WeekdayChips(mask = form.recurrenceMask, onToggle = vm::toggleDay)
-            if (form.recurrenceMask != 0) {
-                // выбор чёт/нечёт нужен только когда хоть один день отмечен
-                ParityRadioRow(parity = form.weekParity, onPick = vm::setParity)
-            }
+            RecurrenceField(
+                mask = form.recurrenceMask,
+                parity = form.weekParity,
+                onToggleDay = vm::toggleDay,
+                onSetParity = vm::setParity,
+                onClear = vm::clearRecurrence,
+            )
 
             Button(
                 onClick = { vm.save(onClose) },
@@ -302,6 +310,120 @@ private fun ColorChip(
 }
 
 @Composable
+private fun IconChipsRow(selected: String, onPick: (String) -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        EventIcons.keys.forEach { key ->
+            val isSelected = key == selected
+            val bg = if (isSelected) MaterialTheme.colorScheme.primary
+                     else MaterialTheme.colorScheme.surfaceContainerLow
+            val fg = if (isSelected) MaterialTheme.colorScheme.onPrimary
+                     else MaterialTheme.colorScheme.onSurfaceVariant
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(40.dp)
+                    .clip(CircleShape)
+                    .background(bg)
+                    .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape)
+                    .clickable { onPick(key) },
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = EventIcons.vector(key),
+                    contentDescription = EventIcons.labels[key],
+                    tint = fg,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+        }
+    }
+}
+
+// одно поле "Повтор: ..." с диалогом - чтоб не растягивать форму подменюшками
+@Composable
+private fun RecurrenceField(
+    mask: Int,
+    parity: Int,
+    onToggleDay: (Int) -> Unit,
+    onSetParity: (Int) -> Unit,
+    onClear: () -> Unit,
+) {
+    var open by remember { mutableStateOf(false) }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp))
+            .clickable { open = true }
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+    ) {
+        Text(
+            text = "Повтор",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text = recurrenceSummary(mask, parity),
+            style = MaterialTheme.typography.titleMedium,
+        )
+    }
+    if (open) {
+        AlertDialog(
+            onDismissRequest = { open = false },
+            title = { Text("Повтор") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        text = "По каким дням повторять",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    WeekdayChips(mask = mask, onToggle = onToggleDay)
+                    if (mask != 0) {
+                        Text(
+                            text = "На каких неделях",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        ParityRadioRow(parity = parity, onPick = onSetParity)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { open = false }) { Text("Готово") }
+            },
+            dismissButton = {
+                if (mask != 0) {
+                    TextButton(onClick = {
+                        onClear()
+                        open = false
+                    }) { Text("Без повтора") }
+                }
+            },
+        )
+    }
+}
+
+private val weekdayShortLabels = listOf("пн", "вт", "ср", "чт", "пт", "сб", "вс")
+
+// текстовое описание текущего повтора для свёрнутого поля
+private fun recurrenceSummary(mask: Int, parity: Int): String {
+    if (mask == 0) return "без повтора"
+    val days = WeekDays.all.mapIndexedNotNull { idx, bit ->
+        if (mask and bit != 0) weekdayShortLabels[idx] else null
+    }.joinToString(", ")
+    val suffix = when (parity) {
+        WeekParity.EVEN -> " (через неделю, чёт)"
+        WeekParity.ODD -> " (через неделю, нечёт)"
+        else -> ""
+    }
+    return days + suffix
+}
+
+@Composable
 private fun WeekdayChips(mask: Int, onToggle: (Int) -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -356,8 +478,8 @@ private fun WeekdayChip(
 private fun ParityRadioRow(parity: Int, onPick: (Int) -> Unit) {
     val items = listOf(
         WeekParity.ALL to "Каждую неделю",
-        WeekParity.EVEN to "Чётные",
-        WeekParity.ODD to "Нечётные",
+        WeekParity.EVEN to "Через неделю (чёт)",
+        WeekParity.ODD to "Через неделю (нечёт)",
     )
     Column {
         items.forEach { (value, label) ->

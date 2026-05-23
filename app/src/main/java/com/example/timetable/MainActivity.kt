@@ -9,8 +9,8 @@ import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSiz
 import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import com.example.timetable.ui.theme.TimetableTheme
 
 class MainActivity : ComponentActivity() {
@@ -29,8 +29,9 @@ class MainActivity : ComponentActivity() {
             }
             val windowSize = calculateWindowSizeClass(this)
             TimetableTheme(palette = palette, darkTheme = darkTheme) {
-                // если включён пин, до разблокировки показываем экран ввода
-                var unlocked by remember { mutableStateOf(!PinManager.isPinSet()) }
+                // если включён пин, до разблокировки показываем экран ввода.
+                // rememberSaveable чтоб при складывании foldable activity не теряла unlock
+                var unlocked by rememberSaveable { mutableStateOf(!PinManager.isPinSet()) }
                 if (unlocked) {
                     AppScaffold(widthSize = windowSize.widthSizeClass)
                 } else {
