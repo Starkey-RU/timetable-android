@@ -10,29 +10,34 @@ object IcsExport {
     private val stamp: DateTimeFormatter =
         DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'").withZone(ZoneOffset.UTC)
 
+    // rfc 5545 требует именно CRLF между строками, не lf
+    private const val CRLF = "\r\n"
+
     fun build(events: List<EventEntity>, nowMillis: Long = System.currentTimeMillis()): String {
         val sb = StringBuilder()
-        sb.appendLine("BEGIN:VCALENDAR")
-        sb.appendLine("VERSION:2.0")
-        sb.appendLine("PRODID:-//Timetable//RU")
+        sb.line("BEGIN:VCALENDAR")
+        sb.line("VERSION:2.0")
+        sb.line("PRODID:-//Timetable//RU")
         events.forEach { ev -> appendEvent(sb, ev, nowMillis) }
-        sb.appendLine("END:VCALENDAR")
+        sb.line("END:VCALENDAR")
         return sb.toString()
     }
 
     private fun appendEvent(sb: StringBuilder, ev: EventEntity, nowMillis: Long) {
-        sb.appendLine("BEGIN:VEVENT")
-        sb.appendLine("UID:${ev.id}@timetable")
-        sb.appendLine("DTSTAMP:${stamp.format(Instant.ofEpochMilli(nowMillis))}")
-        sb.appendLine("DTSTART:${stamp.format(Instant.ofEpochMilli(ev.startMillis))}")
-        sb.appendLine("DTEND:${stamp.format(Instant.ofEpochMilli(ev.endMillis))}")
-        sb.appendLine("SUMMARY:${escape(ev.title)}")
+        sb.line("BEGIN:VEVENT")
+        sb.line("UID:${ev.id}@timetable")
+        sb.line("DTSTAMP:${stamp.format(Instant.ofEpochMilli(nowMillis))}")
+        sb.line("DTSTART:${stamp.format(Instant.ofEpochMilli(ev.startMillis))}")
+        sb.line("DTEND:${stamp.format(Instant.ofEpochMilli(ev.endMillis))}")
+        sb.line("SUMMARY:${escape(ev.title)}")
         if (ev.location.isNotBlank()) {
-            sb.appendLine("LOCATION:${escape(ev.location)}")
+            sb.line("LOCATION:${escape(ev.location)}")
         }
-        rruleFor(ev)?.let { sb.appendLine(it) }
-        sb.appendLine("END:VEVENT")
+        rruleFor(ev)?.let { sb.line(it) }
+        sb.line("END:VEVENT")
     }
+
+    private fun StringBuilder.line(text: String): StringBuilder = append(text).append(CRLF)
 
     private fun rruleFor(ev: EventEntity): String? {
         if (ev.recurrenceMask == 0) return null

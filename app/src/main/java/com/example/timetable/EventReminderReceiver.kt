@@ -45,7 +45,7 @@ class EventReminderReceiver : BroadcastReceiver() {
         ).joinToString(" · ")
 
         val builder = NotificationCompat.Builder(context, NotificationScheduler.CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_popup_reminder)
+            .setSmallIcon(R.drawable.ic_notif)
             .setContentTitle(title)
             .setContentText(body)
             .setAutoCancel(true)
