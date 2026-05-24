@@ -15,7 +15,6 @@ class RecurrenceTest {
 
     @Test
     fun `по будням за вторник - одно вхождение`() {
-        // TODO кейсы по чётным/нечётным неделям, граница смены ISO-года, шаблон в будущем
         val tpl = EventEntity(
             id = 1, title = "tpl", location = "", colorKey = "indigo",
             startMillis = millis(2026, 5, 18, 9, 0),
@@ -24,6 +23,25 @@ class RecurrenceTest {
         )
         // 2026-05-19 - вторник
         val out = expandRecurrence(tpl, millis(2026, 5, 19), millis(2026, 5, 20), zone)
+        assertEquals(1, out.size)
+    }
+
+    @Test
+    fun `чётная неделя от начала семестра попадает во вторую неделю`() {
+        val tpl = EventEntity(
+            id = 2, title = "tpl", location = "", colorKey = "indigo",
+            startMillis = millis(2026, 9, 1, 9, 0),
+            endMillis = millis(2026, 9, 1, 10, 0),
+            recurrenceMask = WeekDays.TUE,
+            weekParity = WeekParity.EVEN,
+        )
+        val out = expandRecurrence(
+            event = tpl,
+            fromMillis = millis(2026, 9, 8),
+            toMillis = millis(2026, 9, 9),
+            zone = zone,
+            semesterStart = java.time.LocalDate.of(2026, 9, 1),
+        )
         assertEquals(1, out.size)
     }
 }

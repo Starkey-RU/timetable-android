@@ -342,4 +342,3 @@ private fun TwoPanePlaceholder() {
         )
     }
 }
-

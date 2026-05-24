@@ -6,7 +6,7 @@ import java.io.ByteArrayOutputStream
 import java.util.zip.GZIPInputStream
 import java.util.zip.GZIPOutputStream
 
-// сжатие строки в текстовый вид: gzip + base64. короче в 5-10 раз для длинного JSON
+// сжатие строки в текстовый вид: gzip + base64, обычно заметно меньше длинного JSON
 object TextCompress {
 
     fun pack(text: String): String {
