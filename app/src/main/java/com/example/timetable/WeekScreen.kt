@@ -7,8 +7,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -21,6 +23,7 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -42,7 +45,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.timetable.ui.theme.TimetableTheme
 import androidx.lifecycle.viewmodel.compose.viewModel
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -121,31 +126,95 @@ private fun WeekDayRow(bucket: DayBucket, isToday: Boolean, onClick: () -> Unit 
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = container),
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            DayBadge(date = bucket.date, highlight = isToday)
-            Column(modifier = Modifier.weight(1f)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                DayBadge(date = bucket.date, highlight = isToday)
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = weekdayName(bucket.date),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = onContainer,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Text(
+                        text = bucket.date.format(longDateFormatter),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = onContainer.copy(alpha = 0.7f),
+                    )
+                }
                 Text(
-                    text = weekdayName(bucket.date),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = onContainer,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Text(
-                    text = bucket.date.format(longDateFormatter),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = onContainer.copy(alpha = 0.7f),
+                    text = eventsCountLabel(bucket.count),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = onContainer.copy(alpha = if (bucket.count == 0) 0.5f else 1f),
                 )
             }
+            if (bucket.events.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(10.dp))
+                HorizontalDivider(color = onContainer.copy(alpha = 0.12f))
+                Spacer(modifier = Modifier.height(10.dp))
+                WeekDayTimeline(
+                    events = bucket.events,
+                    onTextColor = onContainer,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun WeekDayTimeline(events: List<EventEntity>, onTextColor: androidx.compose.ui.graphics.Color) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        events.take(3).forEach { event ->
+            WeekEventLine(event = event, onTextColor = onTextColor)
+        }
+        if (events.size > 3) {
             Text(
-                text = eventsCountLabel(bucket.count),
+                text = "+${events.size - 3} ещё",
+                style = MaterialTheme.typography.labelMedium,
+                color = onTextColor.copy(alpha = 0.7f),
+            )
+        }
+    }
+}
+
+@Composable
+private fun WeekEventLine(event: EventEntity, onTextColor: androidx.compose.ui.graphics.Color) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(width = 4.dp, height = 34.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(EventColors.stripe(event.colorKey)),
+        )
+        Icon(
+            imageVector = EventIcons.vector(event.iconKey),
+            contentDescription = null,
+            tint = onTextColor.copy(alpha = 0.72f),
+            modifier = Modifier.size(18.dp),
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = event.title,
                 style = MaterialTheme.typography.bodyMedium,
-                color = onContainer.copy(alpha = if (bucket.count == 0) 0.5f else 1f),
+                color = onTextColor,
+                fontWeight = FontWeight.Medium,
+            )
+            Text(
+                text = listOf(timeRange(event), event.location).filter { it.isNotBlank() }.joinToString(" · "),
+                style = MaterialTheme.typography.bodySmall,
+                color = onTextColor.copy(alpha = 0.68f),
             )
         }
     }
@@ -175,6 +244,16 @@ private fun DayBadge(date: LocalDate, highlight: Boolean) {
 
 private val longDateFormatter: DateTimeFormatter =
     DateTimeFormatter.ofPattern("d MMMM", Locale("ru"))
+
+private val timeFormatter: DateTimeFormatter =
+    DateTimeFormatter.ofPattern("HH:mm", Locale("ru"))
+
+private fun timeRange(event: EventEntity): String {
+    val zone = ZoneId.systemDefault()
+    val start = Instant.ofEpochMilli(event.startMillis).atZone(zone).format(timeFormatter)
+    val end = Instant.ofEpochMilli(event.endMillis).atZone(zone).format(timeFormatter)
+    return "$start-$end"
+}
 
 private fun weekdayName(date: LocalDate): String =
     date.format(DateTimeFormatter.ofPattern("EEEE", Locale("ru")))

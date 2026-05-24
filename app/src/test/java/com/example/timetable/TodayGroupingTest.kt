@@ -17,7 +17,6 @@ class TodayGroupingTest {
 
     @Test
     fun `активное событие попадает в now`() {
-        // TODO граница now == start и now == end, плюс несколько активных одновременно
         val s = groupForToday(listOf(ev(1, 100, 500)), nowMillis = 200)
         assertEquals(listOf(1L), s.now.map { it.id })
         assertNull(s.next)
@@ -25,9 +24,23 @@ class TodayGroupingTest {
 
     @Test
     fun `событие началось вчера и идёт сейчас - в now`() {
-        // TODO событие со вчера на завтра целиком, и завтрашнее с переходом в послезавтра
         val ev = ev(1, at(2026, 5, 19, 23, 0), at(2026, 5, 20, 2, 0))
         val s = groupForToday(listOf(ev), nowMillis = at(2026, 5, 20, 0, 30))
         assertEquals(listOf(1L), s.now.map { it.id })
+    }
+
+    @Test
+    fun `границы активного события считаются полуоткрытым интервалом`() {
+        val event = ev(1, 100, 500)
+        assertEquals(listOf(1L), groupForToday(listOf(event), nowMillis = 100).now.map { it.id })
+        assertEquals(emptyList<Long>(), groupForToday(listOf(event), nowMillis = 500).now.map { it.id })
+    }
+
+    @Test
+    fun `из нескольких будущих событий первое становится next`() {
+        val events = listOf(ev(1, 300, 400), ev(2, 200, 250))
+        val s = groupForToday(events, nowMillis = 100)
+        assertEquals(2L, s.next?.id)
+        assertEquals(listOf(1L), s.later.map { it.id })
     }
 }

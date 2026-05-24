@@ -53,6 +53,7 @@ class WeekViewModelTest {
         val week = buildWeek(listOf(ev(1, wed)), LocalDate.of(2026, 5, 24), zone)
         // среда - индекс 2 (пн=0)
         assertEquals(1, week[2].count)
+        assertEquals(listOf(1L), week[2].events.map { it.id })
         assertEquals(0, week[0].count)
     }
 
@@ -69,5 +70,16 @@ class WeekViewModelTest {
         assertEquals(1, week[4].count) // пт
         assertEquals(0, week[5].count) // сб
         assertEquals(0, week[6].count) // вс
+    }
+
+    @Test
+    fun `события внутри дня отсортированы по времени`() {
+        val day = LocalDate.of(2026, 5, 20)
+        val week = buildWeek(
+            listOf(ev(1, day, startHour = 16), ev(2, day, startHour = 9)),
+            LocalDate.of(2026, 5, 24),
+            zone,
+        )
+        assertEquals(listOf(2L, 1L), week[2].events.map { it.id })
     }
 }

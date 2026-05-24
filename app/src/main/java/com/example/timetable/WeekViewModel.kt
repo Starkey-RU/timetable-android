@@ -14,7 +14,7 @@ import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.ZoneId
 
-data class DayBucket(val date: LocalDate, val count: Int)
+data class DayBucket(val date: LocalDate, val count: Int, val events: List<EventEntity> = emptyList())
 
 // насколько в будущее/прошлое можно листать недели от текущей. ±13 ≈ ±90 дней
 const val WEEK_OFFSET_MAX = 13
@@ -61,8 +61,11 @@ internal fun buildWeekFromMonday(all: List<EventEntity>, monday: LocalDate, zone
         val day = monday.plusDays(offset.toLong())
         val from = day.atStartOfDay(zone).toInstant().toEpochMilli()
         val to = day.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
-        val count = all.sumOf { expandRecurrence(it, from, to, zone, AppPrefs.effectiveSemesterStart(zone)).size }
-        DayBucket(day, count)
+        // разворачиваем повторяющиеся в этот день и сортируем по времени начала -
+        // карточка дня показывает мини-таймлайн из первых трёх
+        val events = all.flatMap { expandRecurrence(it, from, to, zone, AppPrefs.effectiveSemesterStart(zone)) }
+            .sortedBy { it.startMillis }
+        DayBucket(day, events.size, events)
     }
 }
 
