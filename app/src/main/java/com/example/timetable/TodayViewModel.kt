@@ -44,6 +44,16 @@ class TodayViewModel(private val repo: EventRepository) : ViewModel() {
         viewModelScope.launch { repo.deleteById(id) }
     }
 
+    // dayOffset - на сколько дней вперёд сдвинуть копию.
+    // onDone отдаёт id новой записи или null - на случай если хочется тут же открыть редактор
+    fun duplicate(id: Long, dayOffset: Long, onDone: (Long?) -> Unit = {}) {
+        if (AppPrefs.isGuest.value) { onDone(null); return }
+        viewModelScope.launch {
+            val newId = repo.duplicate(id, dayOffset)
+            onDone(newId)
+        }
+    }
+
     // тикаем раз в минуту чтоб карточка "сейчас" не зависла
     private fun nowTicker() = flow {
         while (true) {

@@ -23,6 +23,22 @@ class EventRepository(private val dao: EventDao) {
 
     suspend fun deleteById(id: Long) = dao.deleteById(id)
 
+    // создаёт копию события со сдвигом на dayOffset дней, обнуляет повторение -
+    // повторяющиеся клонировать как разовый экземпляр привычнее, чем тянуть всю серию.
+    // возвращает id новой записи или null если исходного не нашли.
+    suspend fun duplicate(id: Long, dayOffset: Long): Long? {
+        val original = dao.getById(id) ?: return null
+        val shiftMs = dayOffset * 24L * 60L * 60L * 1000L
+        val copy = original.copy(
+            id = 0,
+            startMillis = original.startMillis + shiftMs,
+            endMillis = original.endMillis + shiftMs,
+            recurrenceMask = 0,
+            weekParity = 0,
+        )
+        return dao.insert(copy)
+    }
+
     // чистит разовые события, у которых конец был раньше чем daysOld дней назад.
     // повторяющиеся не трогаем - они продолжают создавать вхождения вперёд.
     // если daysOld <= 0 - выключено, ничего не делаем.

@@ -28,6 +28,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.Book
 import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Event
@@ -246,6 +247,13 @@ fun TodayScreen(onEventClick: (Long) -> Unit = {}, onPickDay: (LocalDate) -> Uni
                 vm.delete(ev.id)
                 selectedForDetails = null
             },
+            onDuplicate = { dayOffset ->
+                val openEditor = AppPrefs.duplicateOpensEditor.value
+                vm.duplicate(ev.id, dayOffset) { newId ->
+                    if (openEditor && newId != null) onEventClick(newId)
+                }
+                selectedForDetails = null
+            },
         )
     }
 
@@ -278,9 +286,12 @@ private fun EventDetailsSheet(
     onDismiss: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
+    onDuplicate: (Long) -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState()
     val stripe = EventColors.stripe(event.colorKey)
+    // диалог "куда дублируем" - сверху шторки, чтоб не уводить с экрана
+    var pickDupOffset by remember { mutableStateOf(false) }
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         Column(
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
@@ -323,6 +334,14 @@ private fun EventDetailsSheet(
                 Text(text = "Редактировать", modifier = Modifier.weight(1f))
             }
             if (!isGuest) {
+                TextButton(
+                    onClick = { pickDupOffset = true },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Icon(imageVector = Icons.Filled.ContentCopy, contentDescription = null)
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(text = "Дублировать", modifier = Modifier.weight(1f))
+                }
                 TextButton(onClick = onDelete, modifier = Modifier.fillMaxWidth()) {
                     Icon(
                         imageVector = Icons.Filled.DeleteOutline,
@@ -341,6 +360,46 @@ private fun EventDetailsSheet(
             Spacer(modifier = Modifier.height(8.dp))
         }
     }
+    if (pickDupOffset) {
+        DuplicateOffsetDialog(
+            onDismiss = { pickDupOffset = false },
+            onPick = { offset ->
+                pickDupOffset = false
+                onDuplicate(offset)
+            },
+        )
+    }
+}
+
+@Composable
+private fun DuplicateOffsetDialog(onDismiss: () -> Unit, onPick: (Long) -> Unit) {
+    val options = listOf(
+        1L to "На завтра",
+        7L to "Через неделю",
+        14L to "Через 2 недели",
+    )
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Дублировать на") },
+        text = {
+            Column {
+                options.forEach { (offset, label) ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onPick(offset) }
+                            .padding(vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(text = label, style = MaterialTheme.typography.bodyLarge)
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Отмена") }
+        },
+    )
 }
 
 @Composable
