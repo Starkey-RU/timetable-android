@@ -179,9 +179,10 @@ fun SettingsScreen(
                     onCheckedChange = { AppPrefs.isGuest.value = it },
                 )
                 SettingsDivider()
+                val leadMin by AppPrefs.reminderLeadMinutes
                 SwitchRow(
                     title = "Уведомления",
-                    subtitle = "напомнить за 10 минут до начала",
+                    subtitle = "напомнить за ${leadLabel(leadMin)} до начала",
                     checked = notificationsOn,
                     onCheckedChange = { enable ->
                         if (!enable) {
@@ -200,6 +201,19 @@ fun SettingsScreen(
                             AppPrefs.notificationsEnabled.value = true
                         }
                     },
+                )
+                SettingsDivider()
+                ReminderLeadRow(
+                    currentMinutes = leadMin,
+                    onPick = { AppPrefs.reminderLeadMinutes.value = it },
+                )
+                SettingsDivider()
+                val dupOpen by AppPrefs.duplicateOpensEditor
+                SwitchRow(
+                    title = "После дубликата открывать редактор",
+                    subtitle = "удобно, если копию обычно тут же правишь",
+                    checked = dupOpen,
+                    onCheckedChange = { AppPrefs.duplicateOpensEditor.value = it },
                 )
                 SettingsDivider()
                 SwitchRow(
@@ -641,6 +655,73 @@ private fun PalettePickerDialog(
             TextButton(onClick = onDismiss) { Text("Закрыть") }
         },
     )
+}
+
+// пресеты времени напоминания в минутах. совпадают с дизайн-документом
+private val reminderLeadPresets = listOf(5, 10, 15, 30, 60)
+
+private fun leadLabel(minutes: Int): String = when {
+    minutes <= 0 -> "0 мин"
+    minutes < 60 -> "$minutes мин"
+    minutes == 60 -> "1 час"
+    else -> "${minutes / 60} ч ${minutes % 60} мин"
+}
+
+@Composable
+private fun ReminderLeadRow(currentMinutes: Int, onPick: (Int) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { open = true }
+            .padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = "За сколько напоминать", style = MaterialTheme.typography.bodyLarge)
+            Text(
+                text = "сдвиг уведомления до начала события",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Text(
+            text = leadLabel(currentMinutes),
+            color = MaterialTheme.colorScheme.primary,
+            style = MaterialTheme.typography.labelLarge,
+        )
+    }
+    if (open) {
+        AlertDialog(
+            onDismissRequest = { open = false },
+            title = { Text("За сколько напоминать") },
+            text = {
+                Column {
+                    reminderLeadPresets.forEach { m ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    onPick(m)
+                                    open = false
+                                }
+                                .padding(vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            RadioButton(selected = m == currentMinutes, onClick = {
+                                onPick(m)
+                                open = false
+                            })
+                            Text(text = leadLabel(m), style = MaterialTheme.typography.bodyLarge)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { open = false }) { Text("Закрыть") }
+            },
+        )
+    }
 }
 
 // 0 = выкл, остальное - сколько дней после конца события его можно стереть

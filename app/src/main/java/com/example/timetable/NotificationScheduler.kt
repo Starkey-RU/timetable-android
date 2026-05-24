@@ -16,8 +16,6 @@ object NotificationScheduler {
     const val EXTRA_LOCATION = "extra_location"
     const val EXTRA_START = "extra_start"
 
-    // за сколько до начала события - 10 минут
-    private const val LEAD_TIME_MS = 10 * 60 * 1000L
     // на сколько вперёд планируем уведомления
     private const val HORIZON_DAYS = 7L
     // ключ в SharedPreferences для списка активных requestCode-ов
@@ -31,7 +29,7 @@ object NotificationScheduler {
                 CHANNEL_ID,
                 "Напоминания о событиях",
                 NotificationManager.IMPORTANCE_DEFAULT,
-            ).apply { description = "Уведомление за 10 минут до начала" }
+            ).apply { description = "Уведомление за заданное время до начала" }
             nm.createNotificationChannel(channel)
         }
     }
@@ -58,12 +56,13 @@ object NotificationScheduler {
         }
 
         val horizonTo = nowMillis + HORIZON_DAYS * 24 * 60 * 60 * 1000L
+        val leadMs = AppPrefs.reminderLeadMinutes.value.coerceAtLeast(0) * 60_000L
         val newCodes = mutableSetOf<String>()
 
         events.forEach { event ->
             val occurrences = expandRecurrence(event, nowMillis, horizonTo, zone, AppPrefs.effectiveSemesterStart(zone))
             occurrences.forEach { occ ->
-                val triggerAt = occ.startMillis - LEAD_TIME_MS
+                val triggerAt = occ.startMillis - leadMs
                 if (triggerAt <= nowMillis) return@forEach
                 // requestCode уникальный по (id, день начала) - чтоб повторяющиеся не затирали друг друга
                 val dayOfYear = ((occ.startMillis / (24 * 60 * 60 * 1000L)) % 366).toInt()

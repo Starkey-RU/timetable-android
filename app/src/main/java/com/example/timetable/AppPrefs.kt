@@ -64,6 +64,12 @@ object AppPrefs {
     // длительности можно показывать как "190 мин" или как "3 ч 10 мин"
     val useHourDurationFormat: MutableState<Boolean> = mutableStateOf(false)
 
+    // за сколько минут до начала события показывать уведомление
+    val reminderLeadMinutes: MutableState<Int> = mutableStateOf(10)
+
+    // после "Дублировать" сразу открывать редактор копии (а не оставаться на сегодня)
+    val duplicateOpensEditor: MutableState<Boolean> = mutableStateOf(false)
+
     // используется в expandRecurrence: null если режим выключен или дата не задана
     fun effectiveSemesterStart(zone: ZoneId = ZoneId.systemDefault()): LocalDate? {
         if (!useSemesterWeeks.value) return null
@@ -99,6 +105,8 @@ object AppPrefs {
     private const val K_DURATIONS = "durations_by_icon"
     private const val K_HAPTICS = "haptics_enabled"
     private const val K_DURATION_HOURS = "duration_hours_format"
+    private const val K_REMINDER_LEAD = "reminder_lead_min"
+    private const val K_DUP_OPEN_EDITOR = "duplicate_open_editor"
     private const val NO_SEMESTER = Long.MIN_VALUE
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -124,6 +132,8 @@ object AppPrefs {
         durationsByIcon.value = parseDurations(prefs.getString(K_DURATIONS, null))
         hapticsEnabled.value = prefs.getBoolean(K_HAPTICS, true)
         useHourDurationFormat.value = prefs.getBoolean(K_DURATION_HOURS, false)
+        reminderLeadMinutes.value = prefs.getInt(K_REMINDER_LEAD, 10)
+        duplicateOpensEditor.value = prefs.getBoolean(K_DUP_OPEN_EDITOR, false)
 
         // подписываемся на изменения и пишем назад. drop(1) чтоб не записать стартовое значение
         scope.launch { snapshotFlow { palette.value }.drop(1).collect { write(prefs, K_PALETTE, it.name) } }
@@ -144,6 +154,8 @@ object AppPrefs {
         scope.launch { snapshotFlow { durationsByIcon.value }.drop(1).collect { write(prefs, K_DURATIONS, encodeDurations(it)) } }
         scope.launch { snapshotFlow { hapticsEnabled.value }.drop(1).collect { writeBool(prefs, K_HAPTICS, it) } }
         scope.launch { snapshotFlow { useHourDurationFormat.value }.drop(1).collect { writeBool(prefs, K_DURATION_HOURS, it) } }
+        scope.launch { snapshotFlow { reminderLeadMinutes.value }.drop(1).collect { writeInt(prefs, K_REMINDER_LEAD, it) } }
+        scope.launch { snapshotFlow { duplicateOpensEditor.value }.drop(1).collect { writeBool(prefs, K_DUP_OPEN_EDITOR, it) } }
     }
 
     // формат "ключ:минуты,..." - читаем терпимо, всё что не парсится пропускаем

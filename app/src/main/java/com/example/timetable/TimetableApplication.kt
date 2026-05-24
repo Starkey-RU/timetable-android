@@ -37,12 +37,14 @@ class TimetableApplication : Application() {
                 }
         }
 
-        // подписываемся на список событий и на тоггл уведомлений - при любом изменении перепланируем
+        // подписываемся на список событий, тоггл уведомлений и время напоминания -
+        // при любом изменении перепланируем
         scope.launch {
             combine(
                 eventRepository.observeAll(),
                 snapshotFlow { AppPrefs.notificationsEnabled.value }.distinctUntilChanged(),
-            ) { events, _ -> events }
+                snapshotFlow { AppPrefs.reminderLeadMinutes.value }.distinctUntilChanged(),
+            ) { events, _, _ -> events }
                 .collect { events ->
                     NotificationScheduler.reschedule(this@TimetableApplication, events)
                 }
