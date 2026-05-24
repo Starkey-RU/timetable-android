@@ -48,6 +48,15 @@ enum class Palette(
         secondaryDark = Color(0xFFD7C5DA),
         tertiary = Color(0xFF7A4A5C),
         tertiaryDark = Color(0xFFE6B5C5),
+    ),
+    Night(
+        title = "Night",
+        primary = Color(0xFF1A3A5C),
+        primaryDark = Color(0xFFA8C6E8),
+        secondary = Color(0xFF3D5366),
+        secondaryDark = Color(0xFFB8C9D9),
+        tertiary = Color(0xFF2F4858),
+        tertiaryDark = Color(0xFFB0C4D0),
     );
 }
 

@@ -27,7 +27,7 @@ object WatchSync {
         val from = today.atStartOfDay(zone).toInstant().toEpochMilli()
         val to = today.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
         // те же вхождения что и Today видит на главном экране
-        val occurrences = events.flatMap { expandRecurrence(it, from, to, zone) }
+        val occurrences = events.flatMap { expandRecurrence(it, from, to, zone, AppPrefs.effectiveSemesterStart(zone)) }
         return occurrences.sortedBy { it.startMillis }.map { it.toWatchPayload() }
     }
 }

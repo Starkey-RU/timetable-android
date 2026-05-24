@@ -61,7 +61,7 @@ internal fun buildWeekFromMonday(all: List<EventEntity>, monday: LocalDate, zone
         val day = monday.plusDays(offset.toLong())
         val from = day.atStartOfDay(zone).toInstant().toEpochMilli()
         val to = day.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
-        val count = all.sumOf { expandRecurrence(it, from, to, zone).size }
+        val count = all.sumOf { expandRecurrence(it, from, to, zone, AppPrefs.effectiveSemesterStart(zone)).size }
         DayBucket(day, count)
     }
 }

@@ -27,6 +27,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.Book
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.FitnessCenter
@@ -34,10 +35,12 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Laptop
 import androidx.compose.material.icons.filled.Restaurant
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -74,7 +77,7 @@ import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TodayScreen(onEventClick: (Long) -> Unit = {}) {
+fun TodayScreen(onEventClick: (Long) -> Unit = {}, onPickDay: (LocalDate) -> Unit = {}) {
     val app = LocalContext.current.applicationContext as TimetableApplication
     val vm: TodayViewModel = viewModel(factory = remember { TodayViewModel.factory(app.eventRepository) })
     val state by vm.state.collectAsState()
@@ -93,6 +96,11 @@ fun TodayScreen(onEventClick: (Long) -> Unit = {}) {
         else Instant.ofEpochMilli(state.nowMillis).atZone(ZoneId.systemDefault()).toLocalDate()
     }
 
+    // показывать ли диалог с месячным календарём
+    var showMonth by remember { mutableStateOf(false) }
+    // все события для точек на календаре
+    val allEvents by remember { app.eventRepository.observeAll() }.collectAsState(initial = emptyList())
+
     // секция "позже сегодня" может быть длинной, по умолчанию сворачиваем
     var laterExpanded by rememberSaveable { mutableStateOf(false) }
     // секция "завершено" - то же самое, но стартовое состояние из настроек
@@ -102,7 +110,20 @@ fun TodayScreen(onEventClick: (Long) -> Unit = {}) {
     Scaffold(
         topBar = {
             if (showGradient) {
-                GradientHeader(brush = gradient.brush, dateLine = todayHeader())
+                // на градиентной шапке иконку календаря накладываем сверху-справа
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    GradientHeader(brush = gradient.brush, dateLine = todayHeader())
+                    IconButton(
+                        onClick = { showMonth = true },
+                        modifier = Modifier.align(Alignment.TopEnd).padding(20.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.CalendarMonth,
+                            contentDescription = "Календарь",
+                            tint = Color.White,
+                        )
+                    }
+                }
             } else {
                 TopAppBar(
                     title = {
@@ -112,6 +133,14 @@ fun TodayScreen(onEventClick: (Long) -> Unit = {}) {
                                 text = todayHeader(),
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = { showMonth = true }) {
+                            Icon(
+                                imageVector = Icons.Filled.CalendarMonth,
+                                contentDescription = "Календарь",
                             )
                         }
                     },
@@ -209,6 +238,25 @@ fun TodayScreen(onEventClick: (Long) -> Unit = {}) {
             onDelete = {
                 vm.delete(ev.id)
                 pickedForActions = null
+            },
+        )
+    }
+
+    if (showMonth) {
+        AlertDialog(
+            onDismissRequest = { showMonth = false },
+            confirmButton = {
+                TextButton(onClick = { showMonth = false }) { Text("Закрыть") }
+            },
+            text = {
+                MonthCalendar(
+                    events = allEvents,
+                    today = today,
+                    onPickDay = { date ->
+                        showMonth = false
+                        onPickDay(date)
+                    },
+                )
             },
         )
     }

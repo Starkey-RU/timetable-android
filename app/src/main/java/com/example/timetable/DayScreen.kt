@@ -70,7 +70,7 @@ fun DayScreen(initialEpochDay: Long, onClose: () -> Unit, onEventClick: (Long) -
     val from = date.atStartOfDay(zone).toInstant().toEpochMilli()
     val to = date.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
     val events = all
-        .flatMap { expandRecurrence(it, from, to, zone) }
+        .flatMap { expandRecurrence(it, from, to, zone, AppPrefs.effectiveSemesterStart(zone)) }
         .sortedBy { it.startMillis }
 
     Scaffold(

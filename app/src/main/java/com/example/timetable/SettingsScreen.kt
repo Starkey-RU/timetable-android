@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -139,6 +140,15 @@ fun SettingsScreen(
             )
         }
         item {
+            val haptics by AppPrefs.hapticsEnabled
+            SwitchRow(
+                title = "Вибрация",
+                subtitle = "короткий отклик при сохранении и удалении",
+                checked = haptics,
+                onCheckedChange = { AppPrefs.hapticsEnabled.value = it },
+            )
+        }
+        item {
             OutlinedButton(
                 onClick = onOpenFoldableSettings,
                 modifier = Modifier.fillMaxWidth(),
@@ -198,6 +208,25 @@ fun SettingsScreen(
                     }
                 },
             )
+        }
+        item { HorizontalDivider() }
+        item { SectionTitle("Учёба") }
+        item {
+            val useSem by AppPrefs.useSemesterWeeks
+            SwitchRow(
+                title = "Считать недели от семестра",
+                subtitle = "иначе чёт/нечёт берётся по календарным неделям года",
+                checked = useSem,
+                onCheckedChange = { AppPrefs.useSemesterWeeks.value = it },
+            )
+        }
+        item {
+            val start by AppPrefs.semesterStart
+            SemesterStartRow(currentMillis = start, onPick = { AppPrefs.semesterStart.value = it })
+        }
+        item {
+            val durations by AppPrefs.durationsByIcon
+            DurationsRow(current = durations, onPick = { AppPrefs.durationsByIcon.value = it })
         }
         item { HorizontalDivider() }
         item { SectionTitle("Информация") }
@@ -716,4 +745,144 @@ private fun SwitchRowPreview() {
             )
         }
     }
+}
+
+// строка-кнопка с текущей датой семестра, по клику открывает Material DatePicker
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+private fun SemesterStartRow(currentMillis: Long?, onPick: (Long?) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    val zone = java.time.ZoneId.systemDefault()
+    val label = if (currentMillis == null) "не задано"
+                else java.time.Instant.ofEpochMilli(currentMillis).atZone(zone).toLocalDate()
+                    .format(java.time.format.DateTimeFormatter.ofPattern("d MMMM yyyy", java.util.Locale("ru")))
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { open = true }
+            .padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = "Начало семестра", style = MaterialTheme.typography.bodyLarge)
+            Text(
+                text = "от этой даты считаются номера недель",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Text(
+            text = label,
+            color = MaterialTheme.colorScheme.primary,
+            style = MaterialTheme.typography.labelLarge,
+        )
+    }
+    if (open) {
+        val state = androidx.compose.material3.rememberDatePickerState(initialSelectedDateMillis = currentMillis)
+        AlertDialog(
+            onDismissRequest = { open = false },
+            text = { androidx.compose.material3.DatePicker(state = state) },
+            confirmButton = {
+                TextButton(onClick = {
+                    onPick(state.selectedDateMillis)
+                    open = false
+                }) { Text("Ок") }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    onPick(null)
+                    open = false
+                }) { Text("Сбросить") }
+            },
+        )
+    }
+}
+
+// редактор длительностей по типу события - 6 строк с шагом 15 минут
+@Composable
+private fun DurationsRow(current: Map<String, Int>, onPick: (Map<String, Int>) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { open = true }
+            .padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = "Длительность по умолчанию", style = MaterialTheme.typography.bodyLarge)
+            Text(
+                text = "сколько минут предлагать для нового события каждого типа",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Text(
+            text = "Изменить",
+            color = MaterialTheme.colorScheme.primary,
+            style = MaterialTheme.typography.labelLarge,
+        )
+    }
+    if (open) {
+        DurationsDialog(initial = current, onConfirm = {
+            onPick(it)
+            open = false
+        }, onDismiss = { open = false })
+    }
+}
+
+@Composable
+private fun DurationsDialog(
+    initial: Map<String, Int>,
+    onConfirm: (Map<String, Int>) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    // локальная копия чтоб правки не уезжали в AppPrefs пока пользователь крутит цифры
+    var draft by remember { mutableStateOf(initial) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Длительность по умолчанию") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                EventIcons.keys.forEach { key ->
+                    val minutes = draft[key] ?: 60
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            imageVector = EventIcons.vector(key),
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp),
+                        )
+                        Text(
+                            text = EventIcons.labels[key] ?: key,
+                            modifier = Modifier.padding(start = 12.dp).weight(1f),
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                        TextButton(onClick = {
+                            val v = (minutes - 15).coerceAtLeast(15)
+                            draft = draft.toMutableMap().apply { this[key] = v }
+                        }) { Text("-15") }
+                        Text(
+                            text = "$minutes мин",
+                            modifier = Modifier.width(60.dp),
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                        TextButton(onClick = {
+                            val v = (minutes + 15).coerceAtMost(8 * 60)
+                            draft = draft.toMutableMap().apply { this[key] = v }
+                        }) { Text("+15") }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(draft) }) { Text("Сохранить") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Отмена") }
+        },
+    )
 }

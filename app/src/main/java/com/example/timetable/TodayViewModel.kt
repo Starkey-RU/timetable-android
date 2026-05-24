@@ -68,7 +68,7 @@ internal fun composeToday(
     val today = Instant.ofEpochMilli(nowMillis).atZone(zone).toLocalDate()
     val from = today.atStartOfDay(zone).toInstant().toEpochMilli()
     val to = today.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
-    val occurrences = all.flatMap { expandRecurrence(it, from, to, zone) }
+    val occurrences = all.flatMap { expandRecurrence(it, from, to, zone, AppPrefs.effectiveSemesterStart(zone)) }
     return groupForToday(occurrences, nowMillis)
 }
 

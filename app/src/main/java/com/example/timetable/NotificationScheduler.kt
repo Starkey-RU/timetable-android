@@ -61,7 +61,7 @@ object NotificationScheduler {
         val newCodes = mutableSetOf<String>()
 
         events.forEach { event ->
-            val occurrences = expandRecurrence(event, nowMillis, horizonTo, zone)
+            val occurrences = expandRecurrence(event, nowMillis, horizonTo, zone, AppPrefs.effectiveSemesterStart(zone))
             occurrences.forEach { occ ->
                 val triggerAt = occ.startMillis - LEAD_TIME_MS
                 if (triggerAt <= nowMillis) return@forEach

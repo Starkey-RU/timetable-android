@@ -16,4 +16,8 @@ data class EventEntity(
     val recurrenceMask: Int = 0,
     // 0 = все недели, 1 = только чётные, 2 = только нечётные
     val weekParity: Int = 0,
+    // учебные поля - заполняются по желанию
+    val teacher: String? = null,
+    val classNumber: String? = null,
+    val room: String? = null,
 )

@@ -12,7 +12,7 @@ import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
 
-@Database(entities = [EventEntity::class], version = 3, exportSchema = false)
+@Database(entities = [EventEntity::class], version = 4, exportSchema = false)
 abstract class TimetableDatabase : RoomDatabase() {
 
     abstract fun eventDao(): EventDao

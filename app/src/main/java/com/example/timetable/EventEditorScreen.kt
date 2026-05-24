@@ -47,6 +47,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
+import android.view.HapticFeedbackConstants
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.collectAsState
@@ -82,6 +84,21 @@ fun EventEditorScreen(eventId: Long?, onClose: () -> Unit) {
     var showStartPicker by remember { mutableStateOf(false) }
     var showEndPicker by remember { mutableStateOf(false) }
     var showDatePicker by remember { mutableStateOf(false) }
+    var conflict by remember { mutableStateOf<EventEntity?>(null) }
+    var pendingSave by remember { mutableStateOf(false) }
+    val view = LocalView.current
+
+    // ищем пересечение с другими событиями в этот же диапазон.
+    // если нашли - покажем диалог, иначе сразу сохраним.
+    LaunchedEffect(pendingSave) {
+        if (pendingSave) {
+            conflict = vm.findConflict(app.eventRepository)
+            if (conflict == null) {
+                vm.save(onClose)
+            }
+            pendingSave = false
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -118,6 +135,32 @@ fun EventEditorScreen(eventId: Long?, onClose: () -> Unit) {
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
+            OutlinedTextField(
+                value = form.teacher,
+                onValueChange = vm::setTeacher,
+                label = { Text("Преподаватель") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                OutlinedTextField(
+                    value = form.classNumber,
+                    onValueChange = vm::setClassNumber,
+                    label = { Text("Пара №") },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f),
+                )
+                OutlinedTextField(
+                    value = form.room,
+                    onValueChange = vm::setRoom,
+                    label = { Text("Аудитория") },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f),
+                )
+            }
 
             Text("Цвет", style = MaterialTheme.typography.labelLarge)
             ColorChipsRow(selected = form.colorKey, onPick = vm::setColor)
@@ -158,7 +201,12 @@ fun EventEditorScreen(eventId: Long?, onClose: () -> Unit) {
             )
 
             Button(
-                onClick = { vm.save(onClose) },
+                onClick = {
+                    if (AppPrefs.hapticsEnabled.value) {
+                        view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
+                    }
+                    pendingSave = true
+                },
                 enabled = form.title.isNotBlank() && !isGuest,
                 modifier = Modifier.fillMaxWidth(),
             ) {
@@ -167,7 +215,12 @@ fun EventEditorScreen(eventId: Long?, onClose: () -> Unit) {
 
             if (vm.isEditing) {
                 OutlinedButton(
-                    onClick = { vm.delete(onClose) },
+                    onClick = {
+                        if (AppPrefs.hapticsEnabled.value) {
+                            view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
+                        }
+                        vm.delete(onClose)
+                    },
                     enabled = !isGuest,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
@@ -212,6 +265,25 @@ fun EventEditorScreen(eventId: Long?, onClose: () -> Unit) {
             onPick = {
                 vm.setDate(it)
                 showDatePicker = false
+            },
+        )
+    }
+
+    conflict?.let { other ->
+        AlertDialog(
+            onDismissRequest = { conflict = null },
+            title = { Text("Накладка по времени") },
+            text = {
+                Text("В это время уже есть: ${other.title}. Всё равно сохранить?")
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    conflict = null
+                    vm.save(onClose)
+                }) { Text("Сохранить") }
+            },
+            dismissButton = {
+                TextButton(onClick = { conflict = null }) { Text("Отмена") }
             },
         )
     }

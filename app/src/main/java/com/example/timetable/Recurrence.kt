@@ -4,6 +4,7 @@ import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import java.time.temporal.ChronoUnit
 import java.time.temporal.WeekFields
 
 // биты дней недели (1..7 в java.time -> биты 0..6 у нас)
@@ -45,6 +46,8 @@ fun expandRecurrence(
     fromMillis: Long,
     toMillis: Long,
     zone: ZoneId = ZoneId.systemDefault(),
+    // если задан - чёт/нечёт считаются от этой даты, а не по ISO-неделям года
+    semesterStart: LocalDate? = null,
 ): List<EventEntity> {
     if (event.recurrenceMask == 0) {
         return if (event.startMillis < toMillis && event.endMillis > fromMillis) listOf(event)
@@ -65,7 +68,7 @@ fun expandRecurrence(
     val result = mutableListOf<EventEntity>()
     var d = scanFrom
     while (!d.isAfter(scanTo)) {
-        if (!d.isBefore(templateDate) && dayMatches(d, event.recurrenceMask) && parityMatches(d, event.weekParity)) {
+        if (!d.isBefore(templateDate) && dayMatches(d, event.recurrenceMask) && parityMatches(d, event.weekParity, semesterStart)) {
             val startInst = d.atTime(timeOfDay).atZone(zone).toInstant().toEpochMilli()
             val endInst = startInst + durationMillis
             if (startInst < toMillis && endInst > fromMillis) {
@@ -82,12 +85,21 @@ private fun dayMatches(date: LocalDate, mask: Int): Boolean {
     return (mask and bit) != 0
 }
 
-private fun parityMatches(date: LocalDate, parity: Int): Boolean {
+private fun parityMatches(date: LocalDate, parity: Int, semesterStart: LocalDate?): Boolean {
     if (parity == WeekParity.ALL) return true
-    val week = date.get(WeekFields.ISO.weekOfWeekBasedYear())
+    val week = if (semesterStart != null) semesterWeekNumber(date, semesterStart)
+               else date.get(WeekFields.ISO.weekOfWeekBasedYear())
     return when (parity) {
         WeekParity.EVEN -> week % 2 == 0
         WeekParity.ODD -> week % 2 == 1
         else -> true
     }
+}
+
+// нумерация недели от начала семестра: первая = 1, дальше +1 каждую новую календарную неделю.
+// сравниваем понедельники, чтоб не зависело от того в какой день месяца попал старт.
+private fun semesterWeekNumber(date: LocalDate, start: LocalDate): Int {
+    val mondayOf: (LocalDate) -> LocalDate = { it.minusDays((it.dayOfWeek.value - 1).toLong()) }
+    val diffWeeks = ChronoUnit.WEEKS.between(mondayOf(start), mondayOf(date))
+    return (diffWeeks + 1).toInt()
 }
