@@ -29,6 +29,7 @@ import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.Book
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -42,6 +43,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
@@ -85,10 +87,9 @@ fun TodayScreen(onEventClick: (Long) -> Unit = {}, onPickDay: (LocalDate) -> Uni
     val showGradient by AppPrefs.showGradientHeader
     val gradient by AppPrefs.gradient
 
-    // событие, по которому долго нажали - показываем шторку с действиями.
-    // в гостевом режиме шторку не открываем, удалять всё равно нельзя
-    var pickedForActions by remember { mutableStateOf<EventEntity?>(null) }
-    val handleLongClick: (EventEntity) -> Unit = { ev -> if (!isGuest) pickedForActions = ev }
+    // по тапу показываем подробности, редактирование открывается отдельной кнопкой
+    var selectedForDetails by remember { mutableStateOf<EventEntity?>(null) }
+    val openDetails: (EventEntity) -> Unit = { ev -> selectedForDetails = ev }
 
     // одна "сегодняшняя" дата на весь экран чтоб карточки не ушли в разные дни
     val today = remember(state.nowMillis) {
@@ -171,8 +172,8 @@ fun TodayScreen(onEventClick: (Long) -> Unit = {}, onPickDay: (LocalDate) -> Uni
                         badge = "Сейчас",
                         emphasized = true,
                         nowMillis = state.nowMillis,
-                        onClick = { onEventClick(ev.id) },
-                        onLongClick = { handleLongClick(ev) },
+                        onClick = { openDetails(ev) },
+                        onLongClick = { openDetails(ev) },
                     )
                 }
             }
@@ -182,8 +183,8 @@ fun TodayScreen(onEventClick: (Long) -> Unit = {}, onPickDay: (LocalDate) -> Uni
                         event = ev,
                         today = today,
                         badge = "Дальше",
-                        onClick = { onEventClick(ev.id) },
-                        onLongClick = { handleLongClick(ev) },
+                        onClick = { openDetails(ev) },
+                        onLongClick = { openDetails(ev) },
                     )
                 }
             }
@@ -201,8 +202,8 @@ fun TodayScreen(onEventClick: (Long) -> Unit = {}, onPickDay: (LocalDate) -> Uni
                         EventCard(
                             event = ev,
                             today = today,
-                            onClick = { onEventClick(ev.id) },
-                            onLongClick = { handleLongClick(ev) },
+                            onClick = { openDetails(ev) },
+                            onLongClick = { openDetails(ev) },
                         )
                     }
                 }
@@ -222,8 +223,8 @@ fun TodayScreen(onEventClick: (Long) -> Unit = {}, onPickDay: (LocalDate) -> Uni
                             event = ev,
                             today = today,
                             completed = true,
-                            onClick = { onEventClick(ev.id) },
-                            onLongClick = { handleLongClick(ev) },
+                            onClick = { openDetails(ev) },
+                            onLongClick = { openDetails(ev) },
                         )
                     }
                 }
@@ -231,13 +232,19 @@ fun TodayScreen(onEventClick: (Long) -> Unit = {}, onPickDay: (LocalDate) -> Uni
         }
     }
 
-    pickedForActions?.let { ev ->
-        EventActionsSheet(
+    selectedForDetails?.let { ev ->
+        EventDetailsSheet(
             event = ev,
-            onDismiss = { pickedForActions = null },
+            today = today,
+            isGuest = isGuest,
+            onDismiss = { selectedForDetails = null },
+            onEdit = {
+                selectedForDetails = null
+                onEventClick(ev.id)
+            },
             onDelete = {
                 vm.delete(ev.id)
-                pickedForActions = null
+                selectedForDetails = null
             },
         )
     }
@@ -264,38 +271,87 @@ fun TodayScreen(onEventClick: (Long) -> Unit = {}, onPickDay: (LocalDate) -> Uni
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun EventActionsSheet(
+private fun EventDetailsSheet(
     event: EventEntity,
+    today: LocalDate,
+    isGuest: Boolean,
     onDismiss: () -> Unit,
+    onEdit: () -> Unit,
     onDelete: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState()
+    val stripe = EventColors.stripe(event.colorKey)
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
-        Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) {
-            Text(
-                text = event.title,
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-            )
-            TextButton(
-                onClick = onDelete,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.DeleteOutline,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.error,
+        Column(
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Top) {
+                Box(
+                    modifier = Modifier
+                        .width(5.dp)
+                        .height(56.dp)
+                        .clip(RoundedCornerShape(3.dp))
+                        .background(stripe),
                 )
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(text = event.title, style = MaterialTheme.typography.titleLarge)
+                    Text(
+                        text = formatCrossDayTime(event.startMillis, event.endMillis, today),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    if (event.location.isNotBlank()) {
+                        Text(
+                            text = event.location,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+            academicLabel(event)?.let { label ->
+                DetailText(label = "Учебные поля", value = label)
+            }
+            if (event.recurrenceMask != 0) {
+                DetailText(label = "Повтор", value = recurrenceDetails(event))
+            }
+            HorizontalDivider()
+            TextButton(onClick = onEdit, modifier = Modifier.fillMaxWidth()) {
+                Icon(imageVector = Icons.Filled.Edit, contentDescription = null)
                 Spacer(modifier = Modifier.width(12.dp))
-                Text(
-                    text = "Удалить",
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.weight(1f),
-                    style = MaterialTheme.typography.bodyLarge,
-                )
+                Text(text = "Редактировать", modifier = Modifier.weight(1f))
+            }
+            if (!isGuest) {
+                TextButton(onClick = onDelete, modifier = Modifier.fillMaxWidth()) {
+                    Icon(
+                        imageVector = Icons.Filled.DeleteOutline,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error,
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = "Удалить",
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.weight(1f),
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                }
             }
             Spacer(modifier = Modifier.height(8.dp))
         }
+    }
+}
+
+@Composable
+private fun DetailText(label: String, value: String) {
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(text = value, style = MaterialTheme.typography.bodyMedium)
     }
 }
 
@@ -378,6 +434,17 @@ private fun EventCard(
                             overflow = TextOverflow.Ellipsis,
                         )
                     }
+                    // учебная строка - препод/пара/аудитория. если все три пустые - скипаем
+                    val academic = academicLabel(event)
+                    if (academic != null) {
+                        Text(
+                            text = academic,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                     if (emphasized && nowMillis in event.startMillis..event.endMillis) {
                         val total = (event.endMillis - event.startMillis).coerceAtLeast(1)
                         val progress = ((nowMillis - event.startMillis).toFloat() / total).coerceIn(0f, 1f)
@@ -393,7 +460,7 @@ private fun EventCard(
                             color = stripe,
                         )
                         Text(
-                            text = "осталось $leftMin мин · до ${formatTime(event.endMillis)}",
+                            text = "осталось ${formatDurationShort(leftMin.toInt())} · до ${formatTime(event.endMillis)}",
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -531,6 +598,31 @@ private fun dayLabel(date: LocalDate, today: LocalDate, time: String): String = 
     today.plusDays(1) -> "завтра $time"
     // длинные события на несколько дней - редкий случай, печатаем дату
     else -> date.format(DateTimeFormatter.ofPattern("d MMM", Locale("ru"))) + " $time"
+}
+
+// собираем учебную подпись типа "3 пара · ауд. 312 · Иванов И.И."
+// если все поля пустые - возвращаем null, чтобы не рендерить пустой Text
+private fun academicLabel(event: EventEntity): String? {
+    val parts = mutableListOf<String>()
+    val cls = event.classNumber?.trim().orEmpty()
+    if (cls.isNotEmpty()) parts.add("$cls пара")
+    val rm = event.room?.trim().orEmpty()
+    if (rm.isNotEmpty()) parts.add("ауд. $rm")
+    val tch = event.teacher?.trim().orEmpty()
+    if (tch.isNotEmpty()) parts.add(tch)
+    return if (parts.isEmpty()) null else parts.joinToString(" · ")
+}
+
+private fun recurrenceDetails(event: EventEntity): String {
+    val days = WeekDays.all.mapIndexedNotNull { idx, bit ->
+        if (event.recurrenceMask and bit != 0) WeekDays.labels[idx] else null
+    }.joinToString(", ")
+    val parity = when (event.weekParity) {
+        WeekParity.EVEN -> "через неделю, чётная"
+        WeekParity.ODD -> "через неделю, нечётная"
+        else -> "каждую неделю"
+    }
+    return "$days, $parity"
 }
 
 private fun todayHeader(): String {
