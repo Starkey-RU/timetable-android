@@ -61,6 +61,9 @@ object AppPrefs {
     // короткая вибрация при сохранении и удалении события
     val hapticsEnabled: MutableState<Boolean> = mutableStateOf(true)
 
+    // длительности можно показывать как "190 мин" или как "3 ч 10 мин"
+    val useHourDurationFormat: MutableState<Boolean> = mutableStateOf(false)
+
     // используется в expandRecurrence: null если режим выключен или дата не задана
     fun effectiveSemesterStart(zone: ZoneId = ZoneId.systemDefault()): LocalDate? {
         if (!useSemesterWeeks.value) return null
@@ -95,6 +98,7 @@ object AppPrefs {
     private const val K_USE_SEMESTER_WEEKS = "use_semester_weeks"
     private const val K_DURATIONS = "durations_by_icon"
     private const val K_HAPTICS = "haptics_enabled"
+    private const val K_DURATION_HOURS = "duration_hours_format"
     private const val NO_SEMESTER = Long.MIN_VALUE
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -119,6 +123,7 @@ object AppPrefs {
         useSemesterWeeks.value = prefs.getBoolean(K_USE_SEMESTER_WEEKS, false)
         durationsByIcon.value = parseDurations(prefs.getString(K_DURATIONS, null))
         hapticsEnabled.value = prefs.getBoolean(K_HAPTICS, true)
+        useHourDurationFormat.value = prefs.getBoolean(K_DURATION_HOURS, false)
 
         // подписываемся на изменения и пишем назад. drop(1) чтоб не записать стартовое значение
         scope.launch { snapshotFlow { palette.value }.drop(1).collect { write(prefs, K_PALETTE, it.name) } }
@@ -138,6 +143,7 @@ object AppPrefs {
         scope.launch { snapshotFlow { useSemesterWeeks.value }.drop(1).collect { writeBool(prefs, K_USE_SEMESTER_WEEKS, it) } }
         scope.launch { snapshotFlow { durationsByIcon.value }.drop(1).collect { write(prefs, K_DURATIONS, encodeDurations(it)) } }
         scope.launch { snapshotFlow { hapticsEnabled.value }.drop(1).collect { writeBool(prefs, K_HAPTICS, it) } }
+        scope.launch { snapshotFlow { useHourDurationFormat.value }.drop(1).collect { writeBool(prefs, K_DURATION_HOURS, it) } }
     }
 
     // формат "ключ:минуты,..." - читаем терпимо, всё что не парсится пропускаем
