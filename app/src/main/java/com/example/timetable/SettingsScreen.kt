@@ -43,6 +43,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.example.timetable.ui.theme.TimetableTheme
 import android.Manifest
 import android.content.ClipData
@@ -91,6 +93,9 @@ fun SettingsScreen(
     var showShare by remember { mutableStateOf(false) }
     var shareText by remember { mutableStateOf("") }
     var showImport by remember { mutableStateOf(false) }
+    // экраны QR показываем поверх настроек как полноэкранные диалоги
+    var showQrShare by remember { mutableStateOf(false) }
+    var showQrScan by remember { mutableStateOf(false) }
 
     LazyColumn(
         modifier = Modifier.fillMaxWidth(),
@@ -294,6 +299,23 @@ fun SettingsScreen(
                 Text("Импортировать из текста")
             }
         }
+        item {
+            Button(
+                onClick = { showQrShare = true },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("Показать QR-код")
+            }
+        }
+        item {
+            OutlinedButton(
+                onClick = { showQrScan = true },
+                enabled = !guestMode,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("Сканировать QR-код")
+            }
+        }
 
         item { HorizontalDivider() }
         item {
@@ -345,6 +367,25 @@ fun SettingsScreen(
                 }
             },
         )
+    }
+
+    if (showQrShare) {
+        // полноэкранный диалог чтоб QR-картинка влезла, ширина платформы по умолчанию узкая
+        Dialog(
+            onDismissRequest = { showQrShare = false },
+            properties = DialogProperties(usePlatformDefaultWidth = false),
+        ) {
+            QrShareScreen(onClose = { showQrShare = false })
+        }
+    }
+
+    if (showQrScan) {
+        Dialog(
+            onDismissRequest = { showQrScan = false },
+            properties = DialogProperties(usePlatformDefaultWidth = false),
+        ) {
+            QrScanScreen(onClose = { showQrScan = false })
+        }
     }
 }
 
