@@ -25,11 +25,14 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            // локальный release apk собирается без отдельного release-keystore
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
     compileOptions {
