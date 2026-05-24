@@ -6,8 +6,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -20,6 +22,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -40,7 +44,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -104,232 +110,224 @@ fun SettingsScreen(
     ) {
         item { HeroBanner(gradient) }
 
-        item { SectionTitle("Тема") }
-        item { ThemeSelector(theme) { AppPrefs.theme.value = it } }
-
-        item { SectionTitle("Палитра") }
         item {
-            PaletteButton(current = palette, onPick = { AppPrefs.palette.value = it })
-        }
-
-        item {
-            GradientButton(current = gradient, onPick = { AppPrefs.gradient.value = it })
-        }
-        item {
-            val showGrad by AppPrefs.showGradientHeader
-            SwitchRow(
-                title = "Цветной заголовок",
-                subtitle = "градиент сверху на экране сегодня",
-                checked = showGrad,
-                onCheckedChange = { AppPrefs.showGradientHeader.value = it },
-            )
-        }
-
-        item { SectionTitle("Внешний вид") }
-        item {
-            val showLabels by AppPrefs.showNavLabels
-            SwitchRow(
-                title = "Подписи у пунктов меню",
-                subtitle = "если выключить - в навигации останутся только иконки",
-                checked = showLabels,
-                onCheckedChange = { AppPrefs.showNavLabels.value = it },
-            )
-        }
-        item {
-            val collapseDone by AppPrefs.collapseDoneByDefault
-            SwitchRow(
-                title = "Сворачивать прошедшие",
-                subtitle = "блок завершённых сегодня по умолчанию свёрнут",
-                checked = collapseDone,
-                onCheckedChange = { AppPrefs.collapseDoneByDefault.value = it },
-            )
-        }
-        item {
-            val haptics by AppPrefs.hapticsEnabled
-            SwitchRow(
-                title = "Вибрация",
-                subtitle = "короткий отклик при сохранении и удалении",
-                checked = haptics,
-                onCheckedChange = { AppPrefs.hapticsEnabled.value = it },
-            )
-        }
-        item {
-            OutlinedButton(
-                onClick = onOpenFoldableSettings,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text("Для широкого экрана")
-            }
-        }
-        item {
-            val days by AppPrefs.autoDeleteDays
-            AutoDeleteRow(currentDays = days, onPick = { AppPrefs.autoDeleteDays.value = it })
-        }
-
-        item { SectionTitle("Доступ") }
-        item {
-            SwitchRow(
-                title = "Гостевой режим",
-                subtitle = "только просмотр, без правок",
-                checked = guestMode,
-                onCheckedChange = { AppPrefs.isGuest.value = it },
-            )
-        }
-        item {
-            SwitchRow(
-                title = "Уведомления",
-                subtitle = "напомнить за 10 минут до начала",
-                checked = notificationsOn,
-                onCheckedChange = { enable ->
-                    if (!enable) {
-                        AppPrefs.notificationsEnabled.value = false
-                        return@SwitchRow
-                    }
-                    // на 13+ просим рантайм-разрешение, иначе уведомления молча не покажутся
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                        val granted = ContextCompat.checkSelfPermission(
-                            context,
-                            Manifest.permission.POST_NOTIFICATIONS,
-                        ) == PackageManager.PERMISSION_GRANTED
-                        if (granted) AppPrefs.notificationsEnabled.value = true
-                        else notifPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
-                    } else {
-                        AppPrefs.notificationsEnabled.value = true
-                    }
-                },
-            )
-        }
-        item {
-            SwitchRow(
-                title = "PIN-код",
-                subtitle = "запрос пин-кода при запуске",
-                checked = pinEnabled,
-                onCheckedChange = { enable ->
-                    if (enable) {
-                        onOpenPinSetup()
-                    } else {
-                        PinManager.clear()
-                        pinChangedTick++
-                    }
-                },
-            )
-        }
-        item { HorizontalDivider() }
-        item { SectionTitle("Учёба") }
-        item {
-            val useSem by AppPrefs.useSemesterWeeks
-            SwitchRow(
-                title = "Считать недели от семестра",
-                subtitle = "иначе чёт/нечёт берётся по календарным неделям года",
-                checked = useSem,
-                onCheckedChange = { AppPrefs.useSemesterWeeks.value = it },
-            )
-        }
-        item {
-            val start by AppPrefs.semesterStart
-            SemesterStartRow(currentMillis = start, onPick = { AppPrefs.semesterStart.value = it })
-        }
-        item {
-            val durations by AppPrefs.durationsByIcon
-            DurationsRow(current = durations, onPick = { AppPrefs.durationsByIcon.value = it })
-        }
-        item { HorizontalDivider() }
-        item { SectionTitle("Информация") }
-        item {
-            OutlinedButton(
-                onClick = onOpenReports,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text("Отчёты (ВКР)")
+            SettingsGroup(title = "Внешний вид") {
+                ThemeSelector(theme) { AppPrefs.theme.value = it }
+                SettingsDivider()
+                PaletteButton(current = palette, onPick = { AppPrefs.palette.value = it })
+                SettingsDivider()
+                GradientButton(current = gradient, onPick = { AppPrefs.gradient.value = it })
+                SettingsDivider()
+                val showGrad by AppPrefs.showGradientHeader
+                SwitchRow(
+                    title = "Цветной заголовок",
+                    subtitle = "градиент сверху на экране сегодня",
+                    checked = showGrad,
+                    onCheckedChange = { AppPrefs.showGradientHeader.value = it },
+                )
+                SettingsDivider()
+                val showLabels by AppPrefs.showNavLabels
+                SwitchRow(
+                    title = "Подписи у пунктов меню",
+                    subtitle = "если выключить - в навигации останутся только иконки",
+                    checked = showLabels,
+                    onCheckedChange = { AppPrefs.showNavLabels.value = it },
+                )
+                SettingsDivider()
+                val collapseDone by AppPrefs.collapseDoneByDefault
+                SwitchRow(
+                    title = "Сворачивать прошедшие",
+                    subtitle = "блок завершённых сегодня по умолчанию свёрнут",
+                    checked = collapseDone,
+                    onCheckedChange = { AppPrefs.collapseDoneByDefault.value = it },
+                )
+                SettingsDivider()
+                val haptics by AppPrefs.hapticsEnabled
+                SwitchRow(
+                    title = "Вибрация",
+                    subtitle = "короткий отклик при сохранении и удалении",
+                    checked = haptics,
+                    onCheckedChange = { AppPrefs.hapticsEnabled.value = it },
+                )
+                SettingsDivider()
+                val hourDuration by AppPrefs.useHourDurationFormat
+                SwitchRow(
+                    title = "Длительность в часах",
+                    subtitle = "например 190 минут показывать как 3 ч 10 мин",
+                    checked = hourDuration,
+                    onCheckedChange = { AppPrefs.useHourDurationFormat.value = it },
+                )
+                SettingsDivider()
+                OutlinedButton(
+                    onClick = onOpenFoldableSettings,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    ButtonLabel("Для широкого экрана")
+                }
+                SettingsDivider()
+                val days by AppPrefs.autoDeleteDays
+                AutoDeleteRow(currentDays = days, onPick = { AppPrefs.autoDeleteDays.value = it })
             }
         }
 
-        item { HorizontalDivider() }
-        item { SectionTitle("Поделиться") }
         item {
-            Button(
-                onClick = {
-                    scope.launch {
-                        val bundle = repo.exportAll()
-                        val json = Json.encodeToString(bundle)
-                        // упаковываем чтоб не вываливать на собеседника километр текста
-                        shareText = TextCompress.pack(json)
-                        showShare = true
-                    }
-                },
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text("Скопировать (сжатый текст)")
+            SettingsGroup(title = "Доступ и уведомления") {
+                SwitchRow(
+                    title = "Гостевой режим",
+                    subtitle = "только просмотр, без правок",
+                    checked = guestMode,
+                    onCheckedChange = { AppPrefs.isGuest.value = it },
+                )
+                SettingsDivider()
+                SwitchRow(
+                    title = "Уведомления",
+                    subtitle = "напомнить за 10 минут до начала",
+                    checked = notificationsOn,
+                    onCheckedChange = { enable ->
+                        if (!enable) {
+                            AppPrefs.notificationsEnabled.value = false
+                            return@SwitchRow
+                        }
+                        // на 13+ просим рантайм-разрешение, иначе уведомления молча не покажутся
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            val granted = ContextCompat.checkSelfPermission(
+                                context,
+                                Manifest.permission.POST_NOTIFICATIONS,
+                            ) == PackageManager.PERMISSION_GRANTED
+                            if (granted) AppPrefs.notificationsEnabled.value = true
+                            else notifPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        } else {
+                            AppPrefs.notificationsEnabled.value = true
+                        }
+                    },
+                )
+                SettingsDivider()
+                SwitchRow(
+                    title = "PIN-код",
+                    subtitle = "запрос пин-кода при запуске",
+                    checked = pinEnabled,
+                    onCheckedChange = { enable ->
+                        if (enable) {
+                            onOpenPinSetup()
+                        } else {
+                            PinManager.clear()
+                            pinChangedTick++
+                        }
+                    },
+                )
             }
         }
         item {
-            OutlinedButton(
-                onClick = {
-                    scope.launch {
-                        val bundle = repo.exportAll()
-                        shareText = Json.encodeToString(bundle)
-                        showShare = true
-                    }
-                },
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text("Скопировать как обычный JSON")
-            }
-        }
-        item {
-            OutlinedButton(
-                onClick = {
-                    scope.launch {
-                        val events = repo.exportAll().events.map { it.toEntity() }
-                        shareText = IcsExport.build(events)
-                        showShare = true
-                    }
-                },
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text("Скопировать как .ics (для календарей)")
-            }
-        }
-        item {
-            OutlinedButton(
-                onClick = { showImport = true },
-                enabled = !guestMode,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text("Импортировать из текста")
-            }
-        }
-        item {
-            Button(
-                onClick = { showQrShare = true },
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text("Показать QR-код")
-            }
-        }
-        item {
-            OutlinedButton(
-                onClick = { showQrScan = true },
-                enabled = !guestMode,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text("Сканировать QR-код")
+            SettingsGroup(title = "Учёба и повторения") {
+                val useSem by AppPrefs.useSemesterWeeks
+                SwitchRow(
+                    title = "Считать недели от семестра",
+                    subtitle = "иначе чёт/нечёт берётся по календарным неделям года",
+                    checked = useSem,
+                    onCheckedChange = { AppPrefs.useSemesterWeeks.value = it },
+                )
+                SettingsDivider()
+                val start by AppPrefs.semesterStart
+                SemesterStartRow(currentMillis = start, onPick = { AppPrefs.semesterStart.value = it })
+                SettingsDivider()
+                val durations by AppPrefs.durationsByIcon
+                DurationsRow(current = durations, onPick = { AppPrefs.durationsByIcon.value = it })
             }
         }
 
-        item { HorizontalDivider() }
         item {
-            Button(
-                onClick = {
-                    scope.launch {
-                        val n = repo.seedTestData()
-                        Toast.makeText(context, "Добавлено $n событий", Toast.LENGTH_SHORT).show()
-                    }
-                },
-                enabled = !guestMode,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text("Заполнить тестовыми данными")
+            SettingsGroup(title = "Отчёты") {
+                OutlinedButton(
+                    onClick = onOpenReports,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    ButtonLabel("Открыть экран отчётов")
+                }
+            }
+        }
+
+        item {
+            SettingsGroup(title = "Данные и обмен") {
+                Button(
+                    onClick = {
+                        scope.launch {
+                            val bundle = repo.exportAll()
+                            val json = Json.encodeToString(bundle)
+                            // упаковываем чтоб не вываливать на собеседника километр текста
+                            shareText = TextCompress.pack(json)
+                            showShare = true
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    ButtonLabel("Скопировать (сжатый текст)")
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = {
+                        scope.launch {
+                            val bundle = repo.exportAll()
+                            shareText = Json.encodeToString(bundle)
+                            showShare = true
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    ButtonLabel("Скопировать как обычный JSON")
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = {
+                        scope.launch {
+                            val events = repo.exportAll().events.map { it.toEntity() }
+                            shareText = IcsExport.build(events)
+                            showShare = true
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    ButtonLabel("Скопировать как .ics")
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = { showImport = true },
+                    enabled = !guestMode,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    ButtonLabel("Импортировать из текста")
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                Button(
+                    onClick = { showQrShare = true },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    ButtonLabel("Показать QR-код")
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = { showQrScan = true },
+                    enabled = !guestMode,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    ButtonLabel("Сканировать QR-код")
+                }
+            }
+        }
+
+        item {
+            SettingsGroup(title = "Демо-данные") {
+                Button(
+                    onClick = {
+                        scope.launch {
+                            val n = repo.seedTestData()
+                            Toast.makeText(context, "Добавлено $n событий", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    enabled = !guestMode,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    ButtonLabel("Заполнить тестовыми данными")
+                }
             }
         }
     }
@@ -478,32 +476,78 @@ private fun HeroBanner(gradient: GradientPreset) {
 }
 
 @Composable
-private fun SectionTitle(text: String) {
+private fun SettingsGroup(
+    title: String,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val largeText = LocalDensity.current.fontScale >= 1.25f
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(22.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        ),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = if (largeText) 12.dp else 16.dp, vertical = 14.dp),
+        ) {
+            Text(
+                text = title.uppercase(),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+            content()
+        }
+    }
+}
+
+@Composable
+private fun ButtonLabel(text: String) {
     Text(
         text = text,
-        style = MaterialTheme.typography.titleMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+    )
+}
+
+@Composable
+private fun SettingsDivider() {
+    HorizontalDivider(
+        modifier = Modifier.padding(vertical = 10.dp),
+        color = MaterialTheme.colorScheme.outlineVariant,
     )
 }
 
 @Composable
 private fun ThemeSelector(current: ThemeMode, onPick: (ThemeMode) -> Unit) {
-    // три варианта в одну горизонтальную строку, чтоб не растягивать настройки на пол-экрана
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
+    val largeText = LocalDensity.current.fontScale >= 1.25f
+    val content: @Composable (Modifier) -> Unit = { itemModifier ->
         ThemeMode.entries.forEach { mode ->
             Row(
-                modifier = Modifier
-                    .weight(1f)
+                modifier = itemModifier
                     .clickable { onPick(mode) },
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 RadioButton(selected = current == mode, onClick = { onPick(mode) })
                 Text(text = mode.title, style = MaterialTheme.typography.bodyMedium)
             }
+        }
+    }
+    if (largeText) {
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            content(Modifier.fillMaxWidth())
+        }
+    } else {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            content(Modifier.weight(1f))
         }
     }
 }
@@ -757,19 +801,34 @@ private fun SwitchRow(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
+    val largeText = LocalDensity.current.fontScale >= 1.25f
+    if (largeText) {
+        Column(modifier = Modifier.fillMaxWidth()) {
             Text(text = title, style = MaterialTheme.typography.bodyLarge)
             Text(
                 text = subtitle,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                Switch(checked = checked, onCheckedChange = onCheckedChange)
+            }
         }
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
+    } else {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(text = title, style = MaterialTheme.typography.bodyLarge)
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Switch(checked = checked, onCheckedChange = onCheckedChange)
+        }
     }
 }
 
@@ -907,7 +966,7 @@ private fun DurationsDialog(
                             draft = draft.toMutableMap().apply { this[key] = v }
                         }) { Text("-15") }
                         Text(
-                            text = "$minutes мин",
+                            text = formatDurationShort(minutes),
                             modifier = Modifier.width(60.dp),
                             style = MaterialTheme.typography.bodyMedium,
                         )
@@ -927,3 +986,4 @@ private fun DurationsDialog(
         },
     )
 }
+
