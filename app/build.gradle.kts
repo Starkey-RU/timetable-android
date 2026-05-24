@@ -68,6 +68,7 @@ dependencies {
     implementation(libs.jbcrypt)
     implementation(libs.androidx.security.crypto)
     implementation(libs.androidx.glance.appwidget)
+    implementation(libs.androidx.work.runtime.ktx)
     implementation("com.journeyapps:zxing-android-embedded:4.3.0")
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

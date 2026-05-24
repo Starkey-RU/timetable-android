@@ -3,6 +3,10 @@ package com.example.timetable
 import android.app.Application
 import androidx.compose.runtime.snapshotFlow
 import androidx.glance.appwidget.updateAll
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkManager
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -27,6 +31,12 @@ class TimetableApplication : Application() {
         scope.launch {
             runCatching { eventRepository.purgePastSingles(AppPrefs.autoDeleteDays.value) }
         }
+
+        // и просим workmanager раз в сутки делать то же самое - на случай если
+        // приложение не открывают неделями
+        val daily = PeriodicWorkRequestBuilder<CleanupWorker>(1, TimeUnit.DAYS).build()
+        WorkManager.getInstance(this)
+            .enqueueUniquePeriodicWork("cleanup_past", ExistingPeriodicWorkPolicy.KEEP, daily)
 
         // и потом - на каждое изменение настройки тоже прогоняем
         scope.launch {
