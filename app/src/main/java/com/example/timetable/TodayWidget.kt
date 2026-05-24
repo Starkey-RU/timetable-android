@@ -18,6 +18,7 @@ import androidx.glance.layout.Box
 import androidx.glance.layout.Column
 import androidx.glance.layout.Row
 import androidx.glance.layout.Spacer
+import androidx.glance.layout.defaultWeight
 import androidx.glance.layout.fillMaxHeight
 import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.fillMaxWidth
@@ -161,7 +162,14 @@ private fun EventCardWidget(event: EventEntity, isNow: Boolean, nowMillis: Long)
                 val leftMin = ((event.endMillis - nowMillis) / 60_000L).coerceAtLeast(0)
                 "до ${formatHM(event.endMillis)} · осталось ${formatDurationShort(leftMin.toInt())}"
             } else {
-                "${formatHM(event.startMillis)} - ${formatHM(event.endMillis)}"
+                // если событие скоро начнётся - подсказка "через N мин",
+                // дальние оставляем как обычный диапазон времени
+                val untilMin = ((event.startMillis - nowMillis) / 60_000L)
+                if (untilMin in 0..120) {
+                    "через ${formatDurationShort(untilMin.toInt())} · ${formatHM(event.startMillis)}"
+                } else {
+                    "${formatHM(event.startMillis)} - ${formatHM(event.endMillis)}"
+                }
             }
             Text(
                 text = timeLine,
@@ -181,8 +189,48 @@ private fun EventCardWidget(event: EventEntity, isNow: Boolean, nowMillis: Long)
                     maxLines = 1,
                 )
             }
+            if (isNow) {
+                Spacer(modifier = GlanceModifier.height(6.dp))
+                WidgetProgressBar(
+                    progress = progressOf(event, nowMillis),
+                    color = stripeColor,
+                )
+            }
         }
     }
+}
+
+// своя полоска прогресса. в glance нет LinearProgressIndicator и нет долевой ширины -
+// поэтому делим бар на 10 одинаковых сегментов и закрашиваем сколько надо.
+@Composable
+private fun WidgetProgressBar(progress: Float, color: ColorProvider) {
+    val filledCount = (progress.coerceIn(0f, 1f) * SEGMENTS).toInt().coerceAtLeast(0)
+    Row(
+        modifier = GlanceModifier
+            .fillMaxWidth()
+            .height(4.dp)
+            .cornerRadius(2.dp)
+            .background(GlanceTheme.colors.surface),
+    ) {
+        repeat(SEGMENTS) { i ->
+            val bg = if (i < filledCount) color else GlanceTheme.colors.surface
+            Box(
+                modifier = GlanceModifier
+                    .fillMaxHeight()
+                    .defaultWeight()
+                    .background(bg),
+            ) {}
+        }
+    }
+}
+
+private const val SEGMENTS = 10
+
+// доля времени, прошедшего от начала события
+private fun progressOf(event: EventEntity, nowMillis: Long): Float {
+    val total = (event.endMillis - event.startMillis).coerceAtLeast(1L)
+    val elapsed = (nowMillis - event.startMillis).coerceAtLeast(0L)
+    return (elapsed.toFloat() / total).coerceIn(0f, 1f)
 }
 
 @Composable
