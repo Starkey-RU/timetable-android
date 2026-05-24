@@ -5,6 +5,7 @@ import androidx.compose.runtime.Composable
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.GlanceTheme
+import androidx.glance.LocalSize
 import androidx.glance.action.actionStartActivity
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
@@ -53,11 +54,23 @@ class TodayWidgetReceiver : GlanceAppWidgetReceiver() {
 
 @Composable
 private fun WidgetBody(state: TodayState) {
-    // приоритет: сейчас > следующее > ничего
-    val main = state.now.firstOrNull() ?: state.next
-    // сколько ещё событий впереди помимо показанной карточки
-    val restCount = state.now.size + (if (state.next != null) 1 else 0) +
-        state.later.size - (if (main != null) 1 else 0)
+    // сколько карточек влезает по высоте виджета
+    val size = LocalSize.current
+    val maxItems = when {
+        size.height < 100.dp -> 1
+        size.height < 180.dp -> 2
+        size.height < 280.dp -> 3
+        else -> 5
+    }
+
+    // упорядоченный список ближайших: сначала идущие сейчас, потом next, потом later
+    val ordered = buildList {
+        addAll(state.now)
+        if (state.next != null) add(state.next)
+        addAll(state.later)
+    }
+    val visible = ordered.take(maxItems)
+    val restCount = ordered.size - visible.size
 
     Column(
         modifier = GlanceModifier
@@ -75,14 +88,21 @@ private fun WidgetBody(state: TodayState) {
             ),
         )
         Spacer(modifier = GlanceModifier.height(8.dp))
-        if (main == null) {
+        if (visible.isEmpty()) {
             EmptyCard()
         } else {
-            EventCardWidget(
-                event = main,
-                isNow = state.now.isNotEmpty() && main == state.now.first(),
-                nowMillis = state.nowMillis,
-            )
+            // первое из state.now считаем "сейчас"
+            val nowFirst = state.now.firstOrNull()
+            visible.forEachIndexed { index, event ->
+                if (index > 0) {
+                    Spacer(modifier = GlanceModifier.height(6.dp))
+                }
+                EventCardWidget(
+                    event = event,
+                    isNow = nowFirst != null && event == nowFirst,
+                    nowMillis = state.nowMillis,
+                )
+            }
             if (restCount > 0) {
                 Spacer(modifier = GlanceModifier.height(6.dp))
                 Text(
@@ -139,7 +159,7 @@ private fun EventCardWidget(event: EventEntity, isNow: Boolean, nowMillis: Long)
             Spacer(modifier = GlanceModifier.height(4.dp))
             val timeLine = if (isNow) {
                 val leftMin = ((event.endMillis - nowMillis) / 60_000L).coerceAtLeast(0)
-                "до ${formatHM(event.endMillis)} · осталось $leftMin мин"
+                "до ${formatHM(event.endMillis)} · осталось ${formatDurationShort(leftMin.toInt())}"
             } else {
                 "${formatHM(event.startMillis)} - ${formatHM(event.endMillis)}"
             }
