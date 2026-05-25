@@ -1,7 +1,8 @@
 package com.example.timetable
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,7 +20,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -33,6 +36,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -47,6 +51,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import android.widget.Toast
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -61,19 +66,50 @@ enum class ScheduleFilter(val title: String) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SchedulesScreen(onEventClick: (Long) -> Unit = {}) {
-    val app = LocalContext.current.applicationContext as TimetableApplication
+    val context = LocalContext.current
+    val app = context.applicationContext as TimetableApplication
     val vm: SchedulesViewModel = viewModel(factory = remember { SchedulesViewModel.factory(app.eventRepository) })
     val all by vm.events.collectAsState()
+    val selected by vm.selectedIds.collectAsState()
+    val isGuest by AppPrefs.isGuest
 
     var query by rememberSaveable { mutableStateOf("") }
     var filter by rememberSaveable { mutableStateOf(ScheduleFilter.All) }
 
     val visible = remember(all, query, filter) { applyFilter(all, query, filter) }
+    val selectionMode = selected.isNotEmpty()
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Расписания", style = MaterialTheme.typography.titleLarge) },
+                title = {
+                    if (selectionMode) {
+                        Text("Выбрано: ${selected.size}", style = MaterialTheme.typography.titleLarge)
+                    } else {
+                        Text("Расписания", style = MaterialTheme.typography.titleLarge)
+                    }
+                },
+                navigationIcon = {
+                    if (selectionMode) {
+                        // крестик слева сбрасывает выбор
+                        IconButton(onClick = { vm.clearSelection() }) {
+                            Icon(Icons.Filled.Close, contentDescription = "Отмена")
+                        }
+                    }
+                },
+                actions = {
+                    if (selectionMode) {
+                        // кнопка удаления справа в шапке
+                        Button(
+                            onClick = {
+                                vm.deleteSelected()
+                            },
+                            modifier = Modifier.padding(end = 8.dp),
+                        ) {
+                            Text("Удалить (${selected.size})")
+                        }
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface,
                 ),
@@ -144,22 +180,62 @@ fun SchedulesScreen(onEventClick: (Long) -> Unit = {}) {
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 items(visible, key = { it.id }) { ev ->
-                    ScheduleRow(event = ev, onClick = { onEventClick(ev.id) })
+                    val isSelected = ev.id in selected
+                    ScheduleRow(
+                        event = ev,
+                        isSelected = isSelected,
+                        onClick = {
+                            if (selectionMode) {
+                                // в режиме выбора обычный тап тоже переключает
+                                vm.toggle(ev.id)
+                            } else {
+                                onEventClick(ev.id)
+                            }
+                        },
+                        onLongClick = {
+                            if (isGuest) {
+                                // гостю редактирование запрещено
+                                Toast.makeText(context, "Только просмотр", Toast.LENGTH_SHORT).show()
+                            } else {
+                                vm.toggle(ev.id)
+                            }
+                        },
+                    )
                 }
             }
         }
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun ScheduleRow(event: EventEntity, onClick: () -> Unit) {
+private fun ScheduleRow(
+    event: EventEntity,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
+) {
     val stripe = EventColors.stripe(event.colorKey)
-    Card(
-        modifier = Modifier
+    // выделенную карточку подсвечиваем рамкой + фоном
+    val container = if (isSelected) {
+        MaterialTheme.colorScheme.secondaryContainer
+    } else {
+        MaterialTheme.colorScheme.surfaceContainerLow
+    }
+    val rowModifier = if (isSelected) {
+        Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
+            .border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(14.dp))
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+    } else {
+        Modifier
+            .fillMaxWidth()
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+    }
+    Card(
+        modifier = rowModifier,
         shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+        colors = CardDefaults.cardColors(containerColor = container),
     ) {
         Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
             Box(
