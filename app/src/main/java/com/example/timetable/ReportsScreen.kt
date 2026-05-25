@@ -30,6 +30,13 @@ import java.time.DayOfWeek
 import java.time.Instant
 import java.time.ZoneId
 
+// держим статистику за последние 7 суток в одной структурке чтоб удобно тестить
+private data class WeekStats(
+    val totalMinutes: Long,
+    val countsByDay: Map<DayOfWeek, Int>,
+    val topByDuration: List<Pair<String, Long>>, // title -> сумма минут
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReportsScreen(onClose: () -> Unit) {
@@ -62,6 +69,13 @@ fun ReportsScreen(onClose: () -> Unit) {
             .take(3)
         val daysSorted = byDay.entries.sortedBy { it.key.value }
 
+        // считаем статистики за последние 7 суток, разворачивая повторы в конкретные вхождения
+        val nowMs = System.currentTimeMillis()
+        val zone = ZoneId.systemDefault()
+        val weekStats = remember(events, nowMs) { computeWeekStats(events, nowMs, zone) }
+        val weekHours = weekStats.totalMinutes / 60
+        val weekRemMin = weekStats.totalMinutes % 60
+
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -90,8 +104,113 @@ fun ReportsScreen(onClose: () -> Unit) {
                     StatRow(label = entry.key, value = entry.value.toString())
                 }
             }
+
+            // блок недельных метрик: общее время, разбивка по дням, топ по длительности
+            item { SectionLabel("За последние 7 дней") }
+            item { StatCard("Всего за неделю", "$weekHours ч $weekRemMin мин") }
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = "По дням недели",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        // выводим все 7 дней подряд, даже если в каком-то дне ноль событий
+                        for (d in DayOfWeek.values()) {
+                            val cnt = weekStats.countsByDay[d] ?: 0
+                            StatRow(label = dayShort(d), value = cnt.toString())
+                        }
+                    }
+                }
+            }
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = "Топ по времени",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        if (weekStats.topByDuration.isEmpty()) {
+                            // пустой случай чтоб не показывать молчаливо пустую карточку
+                            Text(
+                                text = "пока нет данных",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        } else {
+                            for ((title, mins) in weekStats.topByDuration) {
+                                val h = mins / 60
+                                val m = mins % 60
+                                StatRow(label = title, value = "$h ч $m мин")
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
+}
+
+// чистая функция чтоб потом можно было прогнать в тестах без compose-обвязки.
+// берёт окно [now - 7 суток, now), разворачивает повторы и агрегирует:
+// - сколько минут всего попало в окно
+// - сколько вхождений в каждый день недели
+// - топ-3 названий по суммарной длительности (минуты)
+private fun computeWeekStats(
+    events: List<EventEntity>,
+    nowMillis: Long,
+    zone: ZoneId,
+): WeekStats {
+    val weekMs = 7L * 24 * 60 * 60 * 1000
+    val from = nowMillis - weekMs
+    val to = nowMillis
+
+    var totalMin = 0L
+    val perDay = mutableMapOf<DayOfWeek, Int>()
+    val perTitle = mutableMapOf<String, Long>()
+
+    for (ev in events) {
+        // expandRecurrence сам обработает и одиночные (mask == 0), и повторяющиеся
+        val occs = expandRecurrence(ev, from, to, zone)
+        for (occ in occs) {
+            // обрезаем по границам окна на случай если событие пересекает край
+            val s = maxOf(occ.startMillis, from)
+            val e = minOf(occ.endMillis, to)
+            if (e <= s) continue
+            val mins = (e - s) / 60000L
+            totalMin += mins
+            val dow = Instant.ofEpochMilli(occ.startMillis).atZone(zone).dayOfWeek
+            perDay[dow] = (perDay[dow] ?: 0) + 1
+            val key = occ.title.ifBlank { "(без названия)" }
+            perTitle[key] = (perTitle[key] ?: 0L) + mins
+        }
+    }
+
+    val top = perTitle.entries
+        .sortedByDescending { it.value }
+        .take(3)
+        .map { it.key to it.value }
+
+    return WeekStats(totalMinutes = totalMin, countsByDay = perDay, topByDuration = top)
+}
+
+// короткие подписи для таблицы дней - чтоб строки не разъезжались
+private fun dayShort(d: DayOfWeek): String = when (d) {
+    DayOfWeek.MONDAY -> "Пн"
+    DayOfWeek.TUESDAY -> "Вт"
+    DayOfWeek.WEDNESDAY -> "Ср"
+    DayOfWeek.THURSDAY -> "Чт"
+    DayOfWeek.FRIDAY -> "Пт"
+    DayOfWeek.SATURDAY -> "Сб"
+    DayOfWeek.SUNDAY -> "Вс"
 }
 
 @Composable
