@@ -12,10 +12,12 @@ import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
 
-@Database(entities = [EventEntity::class], version = 4, exportSchema = false)
+@Database(entities = [EventEntity::class, ArchivedEventEntity::class], version = 5, exportSchema = false)
 abstract class TimetableDatabase : RoomDatabase() {
 
     abstract fun eventDao(): EventDao
+
+    abstract fun archivedEventDao(): ArchivedEventDao
 
     companion object {
         @Volatile private var instance: TimetableDatabase? = null
@@ -35,7 +37,7 @@ abstract class TimetableDatabase : RoomDatabase() {
                 TimetableDatabase::class.java,
                 "timetable.db",
             )
-                // схема меняется на проде редко, для дипломки норм всё пересоздать
+                // на учебном проекте схема ещё крутится, миграции пока не пишем
                 .fallbackToDestructiveMigration()
                 .addCallback(object : Callback() {
                     override fun onCreate(con: SupportSQLiteDatabase) {

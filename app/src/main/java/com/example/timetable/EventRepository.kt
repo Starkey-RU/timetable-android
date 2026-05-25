@@ -6,7 +6,10 @@ import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
 
-class EventRepository(private val dao: EventDao) {
+class EventRepository(
+    private val dao: EventDao,
+    private val archivedDao: ArchivedEventDao,
+) {
 
     fun observeAll(): Flow<List<EventEntity>> = dao.observeAll()
 
@@ -74,7 +77,42 @@ class EventRepository(private val dao: EventDao) {
         dao.insertAll(sample)
         return sample.size
     }
+
+    // забираем всё текущее расписание и копируем в архив одним заходом,
+    // потом чистим основную таблицу. возвращаем сколько уехало.
+    suspend fun archiveAll(): Int {
+        val current = dao.observeAll().first()
+        if (current.isEmpty()) return 0
+        val now = System.currentTimeMillis()
+        val snapshots = current.map { it.toArchived(now) }
+        archivedDao.insertAll(snapshots)
+        dao.deleteAll()
+        return snapshots.size
+    }
+
+    fun observeArchived(): Flow<List<ArchivedEventEntity>> = archivedDao.observeAll()
+
+    suspend fun clearArchive() = archivedDao.clear()
 }
+
+// мапим активное событие в архивную запись. id сбрасываем чтоб room
+// сам выдал новый, остальное копируем как есть.
+private fun EventEntity.toArchived(archivedAt: Long): ArchivedEventEntity =
+    ArchivedEventEntity(
+        id = 0,
+        title = title,
+        location = location,
+        colorKey = colorKey,
+        iconKey = iconKey,
+        startMillis = startMillis,
+        endMillis = endMillis,
+        recurrenceMask = recurrenceMask,
+        weekParity = weekParity,
+        teacher = teacher,
+        classNumber = classNumber,
+        room = room,
+        archivedAt = archivedAt,
+    )
 
 // варианты типовых расписаний для демонстрации
 enum class PresetKind { UNIVERSITY, SCHOOL, WORK }

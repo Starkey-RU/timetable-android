@@ -17,7 +17,7 @@ import kotlinx.coroutines.launch
 class TimetableApplication : Application() {
 
     val database by lazy { TimetableDatabase.get(this) }
-    val eventRepository by lazy { EventRepository(database.eventDao()) }
+    val eventRepository by lazy { EventRepository(database.eventDao(), database.archivedEventDao()) }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 

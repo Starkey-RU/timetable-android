@@ -23,7 +23,7 @@ class EventRepositoryTest {
         db = Room.inMemoryDatabaseBuilder(ctx, TimetableDatabase::class.java)
             .allowMainThreadQueries()
             .build()
-        repo = EventRepository(db.eventDao())
+        repo = EventRepository(db.eventDao(), db.archivedEventDao())
     }
 
     @After

@@ -38,4 +38,8 @@ interface EventDao {
     // удаляем только разовые (recurrenceMask = 0), повторяющиеся не трогаем
     @Query("DELETE FROM events WHERE recurrenceMask = 0 AND endMillis < :cutoffMillis")
     suspend fun deleteSinglePastBefore(cutoffMillis: Long): Int
+
+    // полная очистка таблицы - используется при архивации семестра
+    @Query("DELETE FROM events")
+    suspend fun deleteAll()
 }
