@@ -365,13 +365,27 @@ fun SettingsScreen(
             onImport = { input ->
                 scope.launch {
                     try {
-                        // если строка начинается с { - думаем что это сырой JSON.
-                        // иначе пробуем разжать (наш сжатый формат)
-                        val raw = if (input.trimStart().startsWith("{")) input
-                                  else TextCompress.unpack(input)
-                        val bundle = Json.decodeFromString<ExportBundle>(raw)
-                        val n = repo.importEvents(bundle)
-                        Toast.makeText(context, "Добавлено $n событий", Toast.LENGTH_SHORT).show()
+                        val trimmed = input.trimStart()
+                        val added: Int = when {
+                            // .ics из google calendar / outlook / нашего экспорта
+                            trimmed.startsWith("BEGIN:VCALENDAR") -> {
+                                val events = IcsImport.parse(input)
+                                events.forEach { repo.add(it) }
+                                events.size
+                            }
+                            // сырой JSON
+                            trimmed.startsWith("{") -> {
+                                val bundle = Json.decodeFromString<ExportBundle>(input)
+                                repo.importEvents(bundle)
+                            }
+                            // наш сжатый формат
+                            else -> {
+                                val raw = TextCompress.unpack(input)
+                                val bundle = Json.decodeFromString<ExportBundle>(raw)
+                                repo.importEvents(bundle)
+                            }
+                        }
+                        Toast.makeText(context, "Добавлено $added событий", Toast.LENGTH_SHORT).show()
                         showImport = false
                     } catch (e: Exception) {
                         Toast.makeText(context, "Не получилось разобрать текст", Toast.LENGTH_LONG).show()
