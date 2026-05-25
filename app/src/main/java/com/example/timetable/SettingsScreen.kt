@@ -34,6 +34,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -80,6 +81,8 @@ fun SettingsScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val repo = remember { (context.applicationContext as TimetableApplication).eventRepository }
+    // для подписи кнопки архивации - сколько сейчас событий в основной таблице
+    val activeEvents by remember { repo.observeAll() }.collectAsState(initial = emptyList())
 
     // запрос разрешения POST_NOTIFICATIONS, нужен только на 13+
     val notifPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -103,6 +106,8 @@ fun SettingsScreen(
     var showQrShare by remember { mutableStateOf(false) }
     var showQrScan by remember { mutableStateOf(false) }
     var showPresets by remember { mutableStateOf(false) }
+    var showArchive by remember { mutableStateOf(false) }
+    var askArchive by remember { mutableStateOf(false) }
 
     LazyColumn(
         modifier = Modifier.fillMaxWidth(),
@@ -330,6 +335,31 @@ fun SettingsScreen(
         }
 
         item {
+            SettingsGroup(title = "Архив") {
+                Text(
+                    text = "Закончился семестр - убираем расписание в архив целиком, основная таблица очищается под новый.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+                Button(
+                    onClick = { askArchive = true },
+                    enabled = !guestMode && activeEvents.isNotEmpty(),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    ButtonLabel("Архивировать текущий семестр")
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = { showArchive = true },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    ButtonLabel("Открыть архив")
+                }
+            }
+        }
+
+        item {
             SettingsGroup(title = "Демо-данные") {
                 Button(
                     onClick = {
@@ -434,6 +464,38 @@ fun SettingsScreen(
                 }
             },
         )
+    }
+
+    if (askArchive) {
+        val n = activeEvents.size
+        AlertDialog(
+            onDismissRequest = { askArchive = false },
+            title = { Text("Архивировать семестр?") },
+            text = {
+                Text("Архивировать $n событий? Основное расписание будет очищено.")
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    askArchive = false
+                    scope.launch {
+                        val moved = repo.archiveAll()
+                        Toast.makeText(context, "Архивировано $moved событий", Toast.LENGTH_SHORT).show()
+                    }
+                }) { Text("Архивировать") }
+            },
+            dismissButton = {
+                TextButton(onClick = { askArchive = false }) { Text("Отмена") }
+            },
+        )
+    }
+
+    if (showArchive) {
+        Dialog(
+            onDismissRequest = { showArchive = false },
+            properties = DialogProperties(usePlatformDefaultWidth = false),
+        ) {
+            ArchiveScreen(onClose = { showArchive = false })
+        }
     }
 }
 
