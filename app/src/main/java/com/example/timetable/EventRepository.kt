@@ -67,7 +67,17 @@ class EventRepository(private val dao: EventDao) {
         dao.insertAll(sample)
         return sample.size
     }
+
+    // готовый набор расписания под роль - чтоб быстро показать как смотрится.
+    suspend fun seedPreset(kind: PresetKind, zone: ZoneId = ZoneId.systemDefault()): Int {
+        val sample = generatePreset(kind, zone)
+        dao.insertAll(sample)
+        return sample.size
+    }
 }
+
+// варианты типовых расписаний для демонстрации
+enum class PresetKind { UNIVERSITY, SCHOOL, WORK }
 
 internal fun generateTestEvents(zone: ZoneId): List<EventEntity> {
     val today = LocalDate.now(zone)

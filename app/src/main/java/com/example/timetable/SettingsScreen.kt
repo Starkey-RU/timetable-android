@@ -102,6 +102,7 @@ fun SettingsScreen(
     // экраны QR показываем поверх настроек как полноэкранные диалоги
     var showQrShare by remember { mutableStateOf(false) }
     var showQrScan by remember { mutableStateOf(false) }
+    var showPresets by remember { mutableStateOf(false) }
 
     LazyColumn(
         modifier = Modifier.fillMaxWidth(),
@@ -342,6 +343,14 @@ fun SettingsScreen(
                 ) {
                     ButtonLabel("Заполнить тестовыми данными")
                 }
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = { showPresets = true },
+                    enabled = !guestMode,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    ButtonLabel("Пресет: университет/школа/работа")
+                }
             }
         }
     }
@@ -413,6 +422,53 @@ fun SettingsScreen(
             QrScanScreen(onClose = { showQrScan = false })
         }
     }
+
+    if (showPresets) {
+        PresetsDialog(
+            onDismiss = { showPresets = false },
+            onPick = { kind ->
+                scope.launch {
+                    val n = repo.seedPreset(kind)
+                    Toast.makeText(context, "Добавлено $n событий", Toast.LENGTH_SHORT).show()
+                    showPresets = false
+                }
+            },
+        )
+    }
+}
+
+@Composable
+private fun PresetsDialog(onDismiss: () -> Unit, onPick: (PresetKind) -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Выберите пресет") },
+        text = {
+            Column {
+                Text(
+                    text = "Заполнит расписание повторяющимися событиями под выбранный сценарий. Существующие события не удаляются.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Button(
+                    onClick = { onPick(PresetKind.UNIVERSITY) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) { ButtonLabel("Университет") }
+                Spacer(modifier = Modifier.height(8.dp))
+                Button(
+                    onClick = { onPick(PresetKind.SCHOOL) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) { ButtonLabel("Школа") }
+                Spacer(modifier = Modifier.height(8.dp))
+                Button(
+                    onClick = { onPick(PresetKind.WORK) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) { ButtonLabel("Работа") }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Отмена") }
+        },
+    )
 }
 
 @Composable
