@@ -44,6 +44,12 @@ class EventReminderReceiver : BroadcastReceiver() {
             location.takeIf { it.isNotBlank() },
         ).joinToString(" · ")
 
+        val notifId = title.hashCode()
+
+        // pendingIntent для кнопки snooze - параметризуем минутами и уникальным requestCode
+        val snooze5Pi = buildSnoozePi(context, notifId, title, location, startMillis, 5)
+        val snooze15Pi = buildSnoozePi(context, notifId, title, location, startMillis, 15)
+
         val builder = NotificationCompat.Builder(context, NotificationScheduler.CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notif)
             .setContentTitle(title)
@@ -51,9 +57,39 @@ class EventReminderReceiver : BroadcastReceiver() {
             .setAutoCancel(true)
             .setContentIntent(contentPi)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            // кнопки отложить - иконку не задаём, на современном android она и так не рисуется
+            .addAction(0, "Отложить 5 мин", snooze5Pi)
+            .addAction(0, "Отложить 15 мин", snooze15Pi)
 
         NotificationManagerCompat.from(context)
-            .notify(title.hashCode(), builder.build())
+            .notify(notifId, builder.build())
+    }
+
+    // собираем pendingIntent на наш NotificationActionsReceiver с нужными extras
+    private fun buildSnoozePi(
+        context: Context,
+        notifId: Int,
+        title: String,
+        location: String,
+        startMillis: Long,
+        minutes: Int,
+    ): PendingIntent {
+        val intent = Intent(context, NotificationActionsReceiver::class.java).apply {
+            action = NotificationActionsReceiver.ACTION_SNOOZE
+            putExtra(NotificationScheduler.EXTRA_TITLE, title)
+            putExtra(NotificationScheduler.EXTRA_LOCATION, location)
+            putExtra(NotificationScheduler.EXTRA_START, startMillis)
+            putExtra(NotificationActionsReceiver.EXTRA_NOTIF_ID, notifId)
+            putExtra(NotificationActionsReceiver.EXTRA_SNOOZE_MINUTES, minutes)
+        }
+        // requestCode уникален по (notifId, minutes) чтоб FLAG_UPDATE_CURRENT не путал кнопки
+        val requestCode = notifId * 31 + minutes
+        return PendingIntent.getBroadcast(
+            context,
+            requestCode,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
     }
 
     private fun formatTime(millis: Long): String {
