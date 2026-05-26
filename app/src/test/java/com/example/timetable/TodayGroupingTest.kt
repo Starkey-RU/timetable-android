@@ -43,4 +43,14 @@ class TodayGroupingTest {
         assertEquals(2L, s.next?.id)
         assertEquals(listOf(1L), s.later.map { it.id })
     }
+
+    @Test
+    fun `фокус переключается на начавшееся событие без минутной задержки`() {
+        val beforeStart = groupForToday(listOf(ev(1, 200, 500)), nowMillis = 199)
+
+        val afterStart = focusStateAt(beforeStart, nowMillis = 200)
+
+        assertEquals(listOf(1L), afterStart.now.map { it.id })
+        assertNull(afterStart.next)
+    }
 }

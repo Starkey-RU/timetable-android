@@ -21,6 +21,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             val palette by AppPrefs.palette
             val theme by AppPrefs.theme
+            val dynamic by AppPrefs.useDynamicColors
             val systemDark = isSystemInDarkTheme()
             val darkTheme = when (theme) {
                 ThemeMode.Auto -> systemDark
@@ -28,7 +29,7 @@ class MainActivity : ComponentActivity() {
                 ThemeMode.Dark -> true
             }
             val windowSize = calculateWindowSizeClass(this)
-            TimetableTheme(palette = palette, darkTheme = darkTheme) {
+            TimetableTheme(palette = palette, darkTheme = darkTheme, dynamic = dynamic) {
                 // если включён пин, до разблокировки показываем экран ввода.
                 // rememberSaveable чтоб при складывании foldable activity не теряла unlock
                 var unlocked by rememberSaveable { mutableStateOf(!PinManager.isPinSet()) }

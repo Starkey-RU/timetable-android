@@ -68,13 +68,29 @@ object NotificationScheduler {
                 val dayOfYear = ((occ.startMillis / (24 * 60 * 60 * 1000L)) % 366).toInt()
                 val code = (event.id.toInt() and 0xFFFF) * 1000 + dayOfYear
                 val pi = buildPendingIntent(context, code, occ)
-                // inexact аларм - под Android 12+ без SCHEDULE_EXACT_ALARM. Для напоминаний хватает
-                am.set(AlarmManager.RTC_WAKEUP, triggerAt, pi)
+                // точный аларм + сквозь doze. без этого уведомление не приходит пока
+                // экран выключен - android складывает inexact в окно обслуживания раз в пару часов.
+                scheduleAlarm(am, triggerAt, pi)
                 newCodes.add(code.toString())
             }
         }
 
         prefs.edit().putStringSet(PREFS_KEY, newCodes).apply()
+    }
+
+    // на android 12+ если есть SCHEDULE_EXACT_ALARM - ставим точный аларм,
+    // он стреляет даже в doze. иначе откатываемся на inexact-but-while-idle.
+    internal fun scheduleAlarm(am: AlarmManager, triggerAt: Long, pi: PendingIntent) {
+        val canExact = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) am.canScheduleExactAlarms() else true
+        if (canExact) {
+            try {
+                am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pi)
+                return
+            } catch (_: SecurityException) {
+                // разрешение могли выключить после проверки
+            }
+        }
+        am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pi)
     }
 
     private fun buildPendingIntent(

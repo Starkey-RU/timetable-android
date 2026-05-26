@@ -32,8 +32,8 @@ class TimetableApplication : Application() {
             runCatching { eventRepository.purgePastSingles(AppPrefs.autoDeleteDays.value) }
         }
 
-        // и просим workmanager раз в сутки делать то же самое - на случай если
-        // приложение не открывают неделями
+        // раз в сутки чистим архив и пополняем очередь уведомлений,
+        // даже если пользователь несколько дней не открывает приложение
         val daily = PeriodicWorkRequestBuilder<CleanupWorker>(1, TimeUnit.DAYS).build()
         WorkManager.getInstance(this)
             .enqueueUniquePeriodicWork("cleanup_past", ExistingPeriodicWorkPolicy.KEEP, daily)

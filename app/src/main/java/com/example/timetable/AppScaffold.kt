@@ -11,10 +11,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.CenterFocusStrong
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.ViewWeek
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -26,6 +28,7 @@ import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.VerticalDivider
 import androidx.navigation.NavHostController
 import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
@@ -58,6 +61,7 @@ private const val EDITOR_ROUTE = "editor"
 private const val EDITOR_ID_ARG = "id"
 private const val NEW_EVENT_ID = -1L
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppScaffold(widthSize: WindowWidthSizeClass = WindowWidthSizeClass.Compact) {
     val nav = rememberNavController()
@@ -74,6 +78,7 @@ fun AppScaffold(widthSize: WindowWidthSizeClass = WindowWidthSizeClass.Compact) 
     // на широком экране (планшет / разложенный foldable) показываем сегодня + редактор рядом.
     // -1L означает "панель закрыта", -2L "новое событие" (просто чтоб не плодить sealed class)
     val isWide = widthSize == WindowWidthSizeClass.Expanded
+    val startedWide = rememberSaveable { isWide }
     var twoPaneSelected by rememberSaveable { mutableStateOf<Long>(-1L) }
     val openInPane: (Long) -> Unit = { id -> twoPaneSelected = id }
 
@@ -93,6 +98,37 @@ fun AppScaffold(widthSize: WindowWidthSizeClass = WindowWidthSizeClass.Compact) 
         Scaffold(
         // в режиме с боковым меню Scaffold берёт остаток ширины, иначе занимает всё сам
         modifier = if (useRail && isTab) Modifier.weight(1f) else Modifier,
+        topBar = {
+            // верхняя панель показывается в двух случаях:
+            // - широкий экран на любом табе - правая кнопка настроек, чтоб не лазить в нижнее меню
+            // - таб "сегодня" на любом экране - кнопка фокус-режима
+            val showFocus = isTab && currentRoute == Tab.Today.route
+            val showWideSettings = startedWide && isTab
+            if (showFocus || showWideSettings) {
+                val title = Tab.entries.firstOrNull { it.route == currentRoute }?.label ?: "Расписание"
+                TopAppBar(
+                    title = { Text(title) },
+                    actions = {
+                        if (showFocus) {
+                            IconButton(onClick = { nav.navigate("focus") }) {
+                                Icon(
+                                    imageVector = Icons.Filled.CenterFocusStrong,
+                                    contentDescription = "Фокус",
+                                )
+                            }
+                        }
+                        if (showWideSettings) {
+                            IconButton(onClick = { nav.navigate("foldable_settings") }) {
+                                Icon(
+                                    imageVector = Icons.Filled.Settings,
+                                    contentDescription = "Настройки",
+                                )
+                            }
+                        }
+                    },
+                )
+            }
+        },
         floatingActionButton = {
             // фаб только там, где есть смысл что-то добавлять: сегодня, неделя, расписания.
             // на настройках и в гостевом режиме прячем
@@ -206,6 +242,7 @@ fun AppScaffold(widthSize: WindowWidthSizeClass = WindowWidthSizeClass.Compact) 
                     onOpenReports = { nav.navigate("reports") },
                     onOpenPinSetup = { nav.navigate("pin_setup") },
                     onOpenFoldableSettings = { nav.navigate("foldable_settings") },
+                    showFoldableSettingsButton = !startedWide,
                 )
             }
             composable(
@@ -234,6 +271,9 @@ fun AppScaffold(widthSize: WindowWidthSizeClass = WindowWidthSizeClass.Compact) 
             }
             composable("foldable_settings") {
                 FoldableSettingsScreen(onClose = { nav.popBackStack() })
+            }
+            composable("focus") {
+                FocusModeScreen(onClose = { nav.popBackStack() })
             }
         }
     }

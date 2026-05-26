@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -19,7 +20,17 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.EventNote
+import androidx.compose.material.icons.filled.AutoMode
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.DataObject
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.FileDownload
+import androidx.compose.material.icons.filled.FileUpload
+import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.QrCode
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -28,11 +39,15 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedIconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -54,11 +69,15 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.timetable.ui.theme.TimetableTheme
 import android.Manifest
+import android.app.AlarmManager
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
+import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -72,10 +91,12 @@ fun SettingsScreen(
     onOpenReports: () -> Unit = {},
     onOpenPinSetup: () -> Unit = {},
     onOpenFoldableSettings: () -> Unit = {},
+    showFoldableSettingsButton: Boolean = true,
 ) {
     val palette by AppPrefs.palette
     val gradient by AppPrefs.gradient
     val theme by AppPrefs.theme
+    val dynamicColors by AppPrefs.useDynamicColors
     val guestMode by AppPrefs.isGuest
     val notificationsOn by AppPrefs.notificationsEnabled
     val context = LocalContext.current
@@ -108,6 +129,9 @@ fun SettingsScreen(
     var showPresets by remember { mutableStateOf(false) }
     var showArchive by remember { mutableStateOf(false) }
     var askArchive by remember { mutableStateOf(false) }
+    // подменю "экспорт" и "импорт" - чтоб 6 кнопок не лежали портянкой
+    var showExportMenu by remember { mutableStateOf(false) }
+    var showImportMenu by remember { mutableStateOf(false) }
 
     LazyColumn(
         modifier = Modifier.fillMaxWidth(),
@@ -119,8 +143,26 @@ fun SettingsScreen(
         item {
             SettingsGroup(title = "Внешний вид") {
                 ThemeSelector(theme) { AppPrefs.theme.value = it }
+                // material you - только на android 12+, ниже там просто нет dynamic*ColorScheme
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    SettingsDivider()
+                    SwitchRow(
+                        title = "Динамические цвета",
+                        subtitle = "взять из обоев на android 12+",
+                        checked = dynamicColors,
+                        onCheckedChange = { AppPrefs.useDynamicColors.value = it },
+                    )
+                }
                 SettingsDivider()
-                PaletteButton(current = palette, onPick = { AppPrefs.palette.value = it })
+                if (dynamicColors) {
+                    Text(
+                        text = "Палитра приложения заменена цветами из обоев. Выключи динамические цвета, чтобы выбрать её вручную.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    PaletteButton(current = palette, onPick = { AppPrefs.palette.value = it })
+                }
                 SettingsDivider()
                 GradientButton(current = gradient, onPick = { AppPrefs.gradient.value = it })
                 SettingsDivider()
@@ -163,12 +205,14 @@ fun SettingsScreen(
                     checked = hourDuration,
                     onCheckedChange = { AppPrefs.useHourDurationFormat.value = it },
                 )
-                SettingsDivider()
-                OutlinedButton(
-                    onClick = onOpenFoldableSettings,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    ButtonLabel("Для широкого экрана")
+                if (showFoldableSettingsButton) {
+                    SettingsDivider()
+                    OutlinedButton(
+                        onClick = onOpenFoldableSettings,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        ButtonLabel("Для широкого экрана")
+                    }
                 }
                 SettingsDivider()
                 val days by AppPrefs.autoDeleteDays
@@ -208,6 +252,38 @@ fun SettingsScreen(
                         }
                     },
                 )
+                // на android 12+ пользователь может разрешить точные alarms отдельно.
+                // без разрешения оставляем напоминания неточными, но всё равно ставим их.
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    val alarmMgr = remember { context.getSystemService(Context.ALARM_SERVICE) as AlarmManager }
+                    val needsExactPerm = !alarmMgr.canScheduleExactAlarms()
+                    if (needsExactPerm) {
+                        SettingsDivider()
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Text(
+                                text = "Точные напоминания отключены системой - уведомления могут опаздывать на часы пока экран выключен.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            OutlinedButton(
+                                onClick = {
+                                    val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+                                        data = Uri.parse("package:${context.packageName}")
+                                    }
+                                    try {
+                                        context.startActivity(intent)
+                                    } catch (e: Exception) {
+                                        Toast.makeText(context, "Не удалось открыть системные настройки", Toast.LENGTH_SHORT).show()
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                ButtonLabel("Разрешить точные напоминания")
+                            }
+                        }
+                    }
+                }
                 SettingsDivider()
                 ReminderLeadRow(
                     currentMinutes = leadMin,
@@ -269,67 +345,30 @@ fun SettingsScreen(
         item {
             SettingsGroup(title = "Данные и обмен") {
                 Button(
-                    onClick = {
-                        scope.launch {
-                            val bundle = repo.exportAll()
-                            val json = Json.encodeToString(bundle)
-                            // упаковываем чтоб не вываливать на собеседника километр текста
-                            shareText = TextCompress.pack(json)
-                            showShare = true
-                        }
-                    },
+                    onClick = { showExportMenu = true },
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    ButtonLabel("Скопировать (сжатый текст)")
+                    Icon(
+                        imageVector = Icons.Filled.FileUpload,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    ButtonLabel("Экспорт")
                 }
                 Spacer(modifier = Modifier.height(8.dp))
                 OutlinedButton(
-                    onClick = {
-                        scope.launch {
-                            val bundle = repo.exportAll()
-                            shareText = Json.encodeToString(bundle)
-                            showShare = true
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    ButtonLabel("Скопировать как обычный JSON")
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedButton(
-                    onClick = {
-                        scope.launch {
-                            val events = repo.exportAll().events.map { it.toEntity() }
-                            shareText = IcsExport.build(events)
-                            showShare = true
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    ButtonLabel("Скопировать как .ics")
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedButton(
-                    onClick = { showImport = true },
+                    onClick = { showImportMenu = true },
                     enabled = !guestMode,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    ButtonLabel("Импортировать из текста")
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-                Button(
-                    onClick = { showQrShare = true },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    ButtonLabel("Показать QR-код")
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedButton(
-                    onClick = { showQrScan = true },
-                    enabled = !guestMode,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    ButtonLabel("Сканировать QR-код")
+                    Icon(
+                        imageVector = Icons.Filled.FileDownload,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    ButtonLabel("Импорт")
                 }
             }
         }
@@ -497,6 +536,176 @@ fun SettingsScreen(
             ArchiveScreen(onClose = { showArchive = false })
         }
     }
+
+    if (showExportMenu) {
+        ExportMenuDialog(
+            onDismiss = { showExportMenu = false },
+            onPickCompressed = {
+                showExportMenu = false
+                scope.launch {
+                    val bundle = repo.exportAll()
+                    val json = Json.encodeToString(bundle)
+                    // упаковываем чтоб не вываливать на собеседника километр текста
+                    shareText = TextCompress.pack(json)
+                    showShare = true
+                }
+            },
+            onPickJson = {
+                showExportMenu = false
+                scope.launch {
+                    val bundle = repo.exportAll()
+                    shareText = Json.encodeToString(bundle)
+                    showShare = true
+                }
+            },
+            onPickIcs = {
+                showExportMenu = false
+                scope.launch {
+                    val events = repo.exportAll().events.map { it.toEntity() }
+                    shareText = IcsExport.build(events)
+                    showShare = true
+                }
+            },
+            onPickQr = {
+                showExportMenu = false
+                showQrShare = true
+            },
+        )
+    }
+
+    if (showImportMenu) {
+        ImportMenuDialog(
+            onDismiss = { showImportMenu = false },
+            onPickText = {
+                showImportMenu = false
+                showImport = true
+            },
+            onPickQr = {
+                showImportMenu = false
+                showQrScan = true
+            },
+        )
+    }
+}
+
+// строка варианта в подменю - иконка, заголовок и подзаголовок
+@Composable
+private fun MenuOptionRow(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .clickable { onClick() }
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(22.dp),
+        )
+        Column(modifier = Modifier.weight(1f).padding(start = 14.dp)) {
+            Text(text = title, style = MaterialTheme.typography.bodyLarge)
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ExportMenuDialog(
+    onDismiss: () -> Unit,
+    onPickCompressed: () -> Unit,
+    onPickJson: () -> Unit,
+    onPickIcs: () -> Unit,
+    onPickQr: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Экспорт") },
+        text = {
+            LazyColumn(
+                modifier = Modifier.heightIn(max = 380.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                item {
+                    MenuOptionRow(
+                        icon = Icons.Filled.Description,
+                        title = "Сжатый текст",
+                        subtitle = "короткая строка, удобно в чат",
+                        onClick = onPickCompressed,
+                    )
+                }
+                item {
+                    MenuOptionRow(
+                        icon = Icons.Filled.DataObject,
+                        title = "JSON",
+                        subtitle = "обычный читаемый формат",
+                        onClick = onPickJson,
+                    )
+                }
+                item {
+                    MenuOptionRow(
+                        icon = Icons.AutoMirrored.Filled.EventNote,
+                        title = ".ics",
+                        subtitle = "для google calendar и outlook",
+                        onClick = onPickIcs,
+                    )
+                }
+                item {
+                    MenuOptionRow(
+                        icon = Icons.Filled.QrCode,
+                        title = "QR-код",
+                        subtitle = "показать на экране для скана",
+                        onClick = onPickQr,
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Отмена") }
+        },
+    )
+}
+
+@Composable
+private fun ImportMenuDialog(
+    onDismiss: () -> Unit,
+    onPickText: () -> Unit,
+    onPickQr: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Импорт") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                MenuOptionRow(
+                    icon = Icons.Filled.Description,
+                    title = "Из текста",
+                    subtitle = "вставить строку или JSON или .ics",
+                    onClick = onPickText,
+                )
+                MenuOptionRow(
+                    icon = Icons.Filled.QrCodeScanner,
+                    title = "По QR-коду",
+                    subtitle = "навести камеру на чужой QR",
+                    onClick = onPickQr,
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Отмена") }
+        },
+    )
 }
 
 @Composable
@@ -653,9 +862,11 @@ private fun SettingsGroup(
 
 @Composable
 private fun ButtonLabel(text: String) {
+    // на крупных шрифтах длинные подписи типа "Архивировать текущий семестр" не влезают в одну строку
+    val largeText = LocalDensity.current.fontScale >= 1.25f
     Text(
         text = text,
-        maxLines = 1,
+        maxLines = if (largeText) 2 else 1,
         overflow = TextOverflow.Ellipsis,
     )
 }
@@ -668,32 +879,96 @@ private fun SettingsDivider() {
     )
 }
 
+// иконка + подпись для трёх вариантов темы
+private fun themeIcon(mode: ThemeMode): ImageVector = when (mode) {
+    ThemeMode.Auto -> Icons.Filled.AutoMode
+    ThemeMode.Light -> Icons.Filled.LightMode
+    ThemeMode.Dark -> Icons.Filled.DarkMode
+}
+
 @Composable
 private fun ThemeSelector(current: ThemeMode, onPick: (ThemeMode) -> Unit) {
     val largeText = LocalDensity.current.fontScale >= 1.25f
-    val content: @Composable (Modifier) -> Unit = { itemModifier ->
-        ThemeMode.entries.forEach { mode ->
-            Row(
-                modifier = itemModifier
-                    .clickable { onPick(mode) },
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                RadioButton(selected = current == mode, onClick = { onPick(mode) })
-                Text(text = mode.title, style = MaterialTheme.typography.bodyMedium)
+    if (largeText) {
+        // на больших шрифтах список из 3 строк, иконка слева - подпись справа
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            ThemeMode.entries.forEach { mode ->
+                val selected = current == mode
+                val bg = if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent
+                val fg = if (selected) MaterialTheme.colorScheme.onSecondaryContainer
+                         else MaterialTheme.colorScheme.onSurface
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(bg)
+                        .border(
+                            1.dp,
+                            if (selected) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.outlineVariant,
+                            RoundedCornerShape(12.dp),
+                        )
+                        .clickable { onPick(mode) }
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        imageVector = themeIcon(mode),
+                        contentDescription = mode.title,
+                        tint = fg,
+                        modifier = Modifier.size(22.dp),
+                    )
+                    Text(
+                        text = mode.title,
+                        modifier = Modifier.padding(start = 14.dp),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = fg,
+                    )
+                }
             }
         }
-    }
-    if (largeText) {
-        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            content(Modifier.fillMaxWidth())
-        }
     } else {
+        // компактный ряд из 3 иконок-кнопок, выделенная подсвечена secondaryContainer
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            content(Modifier.weight(1f))
+            ThemeMode.entries.forEach { mode ->
+                val selected = current == mode
+                val bg = if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent
+                val fg = if (selected) MaterialTheme.colorScheme.onSecondaryContainer
+                         else MaterialTheme.colorScheme.onSurface
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(bg)
+                        .border(
+                            1.dp,
+                            if (selected) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.outlineVariant,
+                            RoundedCornerShape(14.dp),
+                        )
+                        .clickable { onPick(mode) }
+                        .semantics { contentDescription = mode.title }
+                        .padding(vertical = 10.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Icon(
+                        imageVector = themeIcon(mode),
+                        contentDescription = null,
+                        tint = fg,
+                        modifier = Modifier.size(22.dp),
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = mode.title,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = fg,
+                    )
+                }
+            }
         }
     }
 }

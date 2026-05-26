@@ -41,8 +41,7 @@ class NotificationActionsReceiver : BroadcastReceiver() {
         val pi = PendingIntent.getBroadcast(context, requestCode, nextIntent, flags)
 
         val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        // inexact - под android 12+ так не нужен SCHEDULE_EXACT_ALARM
-        am.set(AlarmManager.RTC_WAKEUP, triggerAt, pi)
+        NotificationScheduler.scheduleAlarm(am, triggerAt, pi)
     }
 
     companion object {

@@ -70,6 +70,9 @@ object AppPrefs {
     // после "Дублировать" сразу открывать редактор копии (а не оставаться на сегодня)
     val duplicateOpensEditor: MutableState<Boolean> = mutableStateOf(false)
 
+    // динамические цвета из обоев (material you), доступно с android 12
+    val useDynamicColors: MutableState<Boolean> = mutableStateOf(false)
+
     // используется в expandRecurrence: null если режим выключен или дата не задана
     fun effectiveSemesterStart(zone: ZoneId = ZoneId.systemDefault()): LocalDate? {
         if (!useSemesterWeeks.value) return null
@@ -107,6 +110,7 @@ object AppPrefs {
     private const val K_DURATION_HOURS = "duration_hours_format"
     private const val K_REMINDER_LEAD = "reminder_lead_min"
     private const val K_DUP_OPEN_EDITOR = "duplicate_open_editor"
+    private const val K_DYNAMIC_COLORS = "dynamic_colors"
     private const val NO_SEMESTER = Long.MIN_VALUE
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -134,6 +138,7 @@ object AppPrefs {
         useHourDurationFormat.value = prefs.getBoolean(K_DURATION_HOURS, false)
         reminderLeadMinutes.value = prefs.getInt(K_REMINDER_LEAD, 10)
         duplicateOpensEditor.value = prefs.getBoolean(K_DUP_OPEN_EDITOR, false)
+        useDynamicColors.value = prefs.getBoolean(K_DYNAMIC_COLORS, false)
 
         // подписываемся на изменения и пишем назад. drop(1) чтоб не записать стартовое значение
         scope.launch { snapshotFlow { palette.value }.drop(1).collect { write(prefs, K_PALETTE, it.name) } }
@@ -156,6 +161,7 @@ object AppPrefs {
         scope.launch { snapshotFlow { useHourDurationFormat.value }.drop(1).collect { writeBool(prefs, K_DURATION_HOURS, it) } }
         scope.launch { snapshotFlow { reminderLeadMinutes.value }.drop(1).collect { writeInt(prefs, K_REMINDER_LEAD, it) } }
         scope.launch { snapshotFlow { duplicateOpensEditor.value }.drop(1).collect { writeBool(prefs, K_DUP_OPEN_EDITOR, it) } }
+        scope.launch { snapshotFlow { useDynamicColors.value }.drop(1).collect { writeBool(prefs, K_DYNAMIC_COLORS, it) } }
     }
 
     // формат "ключ:минуты,..." - читаем терпимо, всё что не парсится пропускаем

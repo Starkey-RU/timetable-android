@@ -31,10 +31,14 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.google.zxing.BarcodeFormat
+import com.google.zxing.EncodeHintType
 import com.journeyapps.barcodescanner.BarcodeEncoder
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import java.time.ZoneId
+
+// эмпирический лимит, дальше QR превращается в мелкую кашу
+private const val MAX_QR_CHARS = 1200
+private const val INITIAL_QR_HORIZON_DAYS = 14L
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -44,25 +48,52 @@ fun QrShareScreen(onClose: () -> Unit) {
     var bitmap by remember { mutableStateOf<Bitmap?>(null) }
     var tooBig by remember { mutableStateOf(false) }
     var eventsCount by remember { mutableStateOf(0) }
+    var packedLength by remember { mutableStateOf(0) }
+    var horizonUsed by remember { mutableStateOf(INITIAL_QR_HORIZON_DAYS) }
 
     LaunchedEffect(Unit) {
-        // берём только разовые на ближайшие 14 дней + все повторяющиеся
+        // берём разовые в ограниченном окне + все повторяющиеся
         val bundle = app.eventRepository.exportAll()
-        val zone = ZoneId.systemDefault()
         val now = System.currentTimeMillis()
-        val horizon = now + 14L * 24 * 60 * 60 * 1000
-        val pruned = bundle.events.filter { dto ->
-            dto.recurrenceMask != 0 || (dto.startMillis in now..horizon)
+
+        // сначала сохраняем прежний горизонт, а уменьшаем его только когда QR реально не влезает
+        var horizonDays = INITIAL_QR_HORIZON_DAYS
+        var slim = bundle
+        var packed = ""
+        while (true) {
+            val horizon = now + horizonDays * 24 * 60 * 60 * 1000
+            val pruned = bundle.events.filter { dto ->
+                dto.recurrenceMask != 0 || (dto.startMillis in now..horizon)
+            }
+            slim = bundle.copy(events = pruned)
+            packed = TextCompress.pack(Json.encodeToString(slim))
+            if (packed.length <= MAX_QR_CHARS) {
+                horizonUsed = horizonDays
+                break
+            }
+            // следующая попытка с меньшим окном
+            if (horizonDays <= 1L) {
+                horizonUsed = horizonDays
+                break
+            }
+            horizonDays /= 2
         }
-        val slim = bundle.copy(events = pruned)
-        eventsCount = pruned.size
-        val json = Json.encodeToString(slim)
-        val packed = TextCompress.pack(json)
-        if (packed.length > 2500) {
+
+        if (packed.length > MAX_QR_CHARS) {
+            // даже на одном дне не уместилось
+            packedLength = packed.length
+            eventsCount = slim.events.size
             tooBig = true
         } else {
+            eventsCount = slim.events.size
+            packedLength = packed.length
+            // подсказки кодировщику: маленький margin и явная кодировка
+            val hints = mapOf(
+                EncodeHintType.MARGIN to 2,
+                EncodeHintType.CHARACTER_SET to "UTF-8",
+            )
             // 600x600 px - достаточно для большинства сканеров
-            bitmap = BarcodeEncoder().encodeBitmap(packed, BarcodeFormat.QR_CODE, 600, 600)
+            bitmap = BarcodeEncoder().encodeBitmap(packed, BarcodeFormat.QR_CODE, 600, 600, hints)
         }
     }
 
@@ -92,7 +123,7 @@ fun QrShareScreen(onClose: () -> Unit) {
                 when {
                     tooBig -> {
                         Text(
-                            text = "Слишком много событий чтобы упаковать в один QR. Попробуй экспорт через JSON.",
+                            text = "В одном QR не уместить $eventsCount событий (упаковка $packedLength символов, лимит $MAX_QR_CHARS).\nУменьшается, если убрать повторяющиеся или сократить горизонт. Или экспортируй через JSON и пришли файлом.",
                             style = MaterialTheme.typography.bodyMedium,
                         )
                     }
@@ -110,8 +141,13 @@ fun QrShareScreen(onClose: () -> Unit) {
                             style = MaterialTheme.typography.bodyMedium,
                         )
                         Text(
-                            text = "В коде: $eventsCount событий (разовые до 14 дней + повторяющиеся)",
+                            text = "В коде: $eventsCount событий (разовые до $horizonUsed дней + повторяющиеся)",
                             style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            text = "упаковка: $packedLength симв.",
+                            style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
