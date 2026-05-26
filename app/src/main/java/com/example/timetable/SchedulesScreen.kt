@@ -195,7 +195,7 @@ fun SchedulesScreen(onEventClick: (Long) -> Unit = {}) {
                         onLongClick = {
                             if (isGuest) {
                                 // гостю редактирование запрещено
-                                Toast.makeText(context, "Только просмотр", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, ErrorMessages.GUEST_READ_ONLY, Toast.LENGTH_SHORT).show()
                             } else {
                                 vm.toggle(ev.id)
                             }

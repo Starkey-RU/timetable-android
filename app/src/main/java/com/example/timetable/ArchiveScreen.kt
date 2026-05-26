@@ -112,8 +112,8 @@ fun ArchiveScreen(onClose: () -> Unit) {
     if (askClear) {
         AlertDialog(
             onDismissRequest = { askClear = false },
-            title = { Text("Очистить архив?") },
-            text = { Text("Все архивные записи будут удалены без возможности восстановления.") },
+            title = { Text(ErrorMessages.ARCHIVE_CLEAR_TITLE) },
+            text = { Text(ErrorMessages.ARCHIVE_CLEAR_TEXT) },
             confirmButton = {
                 TextButton(onClick = {
                     askClear = false

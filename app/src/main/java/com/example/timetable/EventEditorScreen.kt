@@ -272,9 +272,9 @@ fun EventEditorScreen(eventId: Long?, onClose: () -> Unit) {
     conflict?.let { other ->
         AlertDialog(
             onDismissRequest = { conflict = null },
-            title = { Text("Накладка по времени") },
+            title = { Text(ErrorMessages.EVENT_CONFLICT_TITLE) },
             text = {
-                Text("В это время уже есть: ${other.title}. Всё равно сохранить?")
+                Text(ErrorMessages.EVENT_CONFLICT_TEXT.format(other.title))
             },
             confirmButton = {
                 TextButton(onClick = {

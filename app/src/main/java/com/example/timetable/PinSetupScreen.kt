@@ -88,8 +88,8 @@ fun PinSetupScreen(onDone: () -> Unit, onCancel: () -> Unit) {
             Button(
                 onClick = {
                     when {
-                        pin.length < 4 -> error = "Минимум 4 цифры"
-                        pin != confirm -> error = "PIN не совпадает"
+                        pin.length < 4 -> error = ErrorMessages.PIN_TOO_SHORT
+                        pin != confirm -> error = ErrorMessages.PIN_MISMATCH
                         else -> {
                             PinManager.setPin(pin)
                             onDone()

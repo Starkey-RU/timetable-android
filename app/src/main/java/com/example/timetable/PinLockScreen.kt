@@ -56,7 +56,7 @@ fun PinLockScreen(onUnlock: () -> Unit) {
         )
         if (wrong) {
             Text(
-                "Неверный PIN",
+                ErrorMessages.PIN_WRONG,
                 color = MaterialTheme.colorScheme.error,
                 modifier = Modifier.padding(top = 8.dp),
             )

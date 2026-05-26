@@ -89,7 +89,7 @@ fun SettingsScreen(
         if (granted) {
             AppPrefs.notificationsEnabled.value = true
         } else {
-            Toast.makeText(context, "Без разрешения уведомления не придут", Toast.LENGTH_LONG).show()
+            Toast.makeText(context, ErrorMessages.NOTIFICATIONS_DENIED, Toast.LENGTH_LONG).show()
         }
     }
 
@@ -365,7 +365,7 @@ fun SettingsScreen(
                     onClick = {
                         scope.launch {
                             val n = repo.seedTestData()
-                            Toast.makeText(context, "Добавлено $n событий", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, ErrorMessages.IMPORT_ADDED.format(n), Toast.LENGTH_SHORT).show()
                         }
                     },
                     enabled = !guestMode,
@@ -391,7 +391,7 @@ fun SettingsScreen(
             onCopy = {
                 val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                 cm.setPrimaryClip(ClipData.newPlainText("расписание", shareText))
-                Toast.makeText(context, "Скопировано в буфер", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, ErrorMessages.EXPORT_COPIED, Toast.LENGTH_SHORT).show()
                 showShare = false
             },
             onDismiss = { showShare = false },
@@ -424,10 +424,10 @@ fun SettingsScreen(
                                 repo.importEvents(bundle)
                             }
                         }
-                        Toast.makeText(context, "Добавлено $added событий", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, ErrorMessages.IMPORT_ADDED.format(added), Toast.LENGTH_SHORT).show()
                         showImport = false
                     } catch (e: Exception) {
-                        Toast.makeText(context, "Не получилось разобрать текст", Toast.LENGTH_LONG).show()
+                        Toast.makeText(context, ErrorMessages.IMPORT_PARSE_FAILED, Toast.LENGTH_LONG).show()
                     }
                 }
             },
@@ -459,7 +459,7 @@ fun SettingsScreen(
             onPick = { kind ->
                 scope.launch {
                     val n = repo.seedPreset(kind)
-                    Toast.makeText(context, "Добавлено $n событий", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, ErrorMessages.IMPORT_ADDED.format(n), Toast.LENGTH_SHORT).show()
                     showPresets = false
                 }
             },
@@ -470,16 +470,16 @@ fun SettingsScreen(
         val n = activeEvents.size
         AlertDialog(
             onDismissRequest = { askArchive = false },
-            title = { Text("Архивировать семестр?") },
+            title = { Text(ErrorMessages.ARCHIVE_CONFIRM_TITLE) },
             text = {
-                Text("Архивировать $n событий? Основное расписание будет очищено.")
+                Text(ErrorMessages.ARCHIVE_CONFIRM_TEXT.format(n))
             },
             confirmButton = {
                 TextButton(onClick = {
                     askArchive = false
                     scope.launch {
                         val moved = repo.archiveAll()
-                        Toast.makeText(context, "Архивировано $moved событий", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, ErrorMessages.ARCHIVE_DONE.format(moved), Toast.LENGTH_SHORT).show()
                     }
                 }) { Text("Архивировать") }
             },

@@ -31,9 +31,9 @@ fun QrScanScreen(onClose: () -> Unit) {
                 val raw = if (text.trimStart().startsWith("{")) text else TextCompress.unpack(text)
                 val bundle = Json.decodeFromString<ExportBundle>(raw)
                 val n = app.eventRepository.importEvents(bundle)
-                Toast.makeText(context, "Добавлено $n событий", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, ErrorMessages.IMPORT_ADDED.format(n), Toast.LENGTH_SHORT).show()
             } catch (e: Exception) {
-                Toast.makeText(context, "Не получилось разобрать QR", Toast.LENGTH_LONG).show()
+                Toast.makeText(context, ErrorMessages.QR_SCAN_FAILED, Toast.LENGTH_LONG).show()
             }
             onClose()
         }
