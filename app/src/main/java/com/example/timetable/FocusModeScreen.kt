@@ -1,5 +1,11 @@
 package com.example.timetable
 
+import android.app.Activity
+import android.content.Context
+import android.view.View
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -16,6 +22,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -26,21 +33,24 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.delay
 
 // полноэкранный режим "фокус": показывает только текущее или ближайшее событие
-// большим шрифтом, с обратным отсчётом. фон - градиент из настроек.
+// большим шрифтом, с обратным отсчётом. фон чёрный амолед чтоб батарею не жрать.
 @Composable
 fun FocusModeScreen(onClose: () -> Unit) {
     val app = LocalContext.current.applicationContext as TimetableApplication
     // переиспользуем тот же view model что и обычный экран сегодня - всё уже посчитано
     val vm: TodayViewModel = viewModel(factory = remember { TodayViewModel.factory(app.eventRepository) })
     val state by vm.state.collectAsState()
-    val gradient by AppPrefs.gradient
 
     // тикает раз в секунду чтоб таймер шёл плавно, а не раз в минуту как в обычном today
     var nowMs by remember { mutableStateOf(System.currentTimeMillis()) }
@@ -51,18 +61,62 @@ fun FocusModeScreen(onClose: () -> Unit) {
         }
     }
 
+    // прячем статус-бар и навигацию пока висит фокус. на выходе возвращаем как было.
+    val view = LocalView.current
+    DisposableEffect(Unit) {
+        val activity = view.findActivity()
+        val window = activity?.window
+        if (window != null) {
+            val controller = WindowCompat.getInsetsController(window, view)
+            val previousBehavior = controller.systemBarsBehavior
+            controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            controller.hide(WindowInsetsCompat.Type.systemBars())
+            onDispose {
+                controller.show(WindowInsetsCompat.Type.systemBars())
+                controller.systemBarsBehavior = previousBehavior
+            }
+        } else {
+            onDispose { }
+        }
+    }
+
+    // подсказка про тап висит первые 4 секунды, потом плавно тает
+    var hintVisible by remember { mutableStateOf(true) }
+    LaunchedEffect(Unit) {
+        delay(4000)
+        hintVisible = false
+    }
+
     // обычный экран обновляет группы раз в минуту, а здесь граница события должна быть точной
     val focusState = focusStateAt(state, nowMs)
     val current: EventEntity? = focusState.now.firstOrNull()
     val upcoming: EventEntity? = current ?: focusState.next
 
+    // текущее время для часов слева сверху, формат HH:mm
+    val zone = java.time.ZoneId.systemDefault()
+    val clockText = java.time.Instant.ofEpochMilli(nowMs).atZone(zone)
+        .format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))
+
+    // цвет события используем как акцент для иконки и таймера
+    val accentColor = upcoming?.let { EventColors.stripe(it.colorKey) } ?: Color.White
+
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(gradient.brush)
+            .background(Color.Black)
             // тап в любом месте закрывает - так и в подсказке написано
             .clickable { onClose() },
     ) {
+        // маленькие часы в левом верхнем углу
+        Text(
+            text = clockText,
+            style = MaterialTheme.typography.titleMedium,
+            color = Color.White.copy(alpha = 0.6f),
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(16.dp),
+        )
+
         // крестик в правом верхнем углу - дублирует тап
         IconButton(
             onClick = onClose,
@@ -73,7 +127,7 @@ fun FocusModeScreen(onClose: () -> Unit) {
             Icon(
                 imageVector = Icons.Filled.Close,
                 contentDescription = "Закрыть",
-                tint = Color.White,
+                tint = Color.White.copy(alpha = 0.8f),
             )
         }
 
@@ -95,11 +149,11 @@ fun FocusModeScreen(onClose: () -> Unit) {
                     .padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                // иконка категории сверху, крупная
+                // иконка категории сверху, крупная, в цвет события
                 Icon(
                     imageVector = EventIcons.vector(upcoming.iconKey),
                     contentDescription = null,
-                    tint = EventColors.stripe(upcoming.colorKey),
+                    tint = accentColor,
                     modifier = Modifier.size(96.dp),
                 )
                 Spacer(modifier = Modifier.height(24.dp))
@@ -116,7 +170,7 @@ fun FocusModeScreen(onClose: () -> Unit) {
                     Text(
                         text = upcoming.location,
                         style = MaterialTheme.typography.bodyLarge,
-                        color = Color.White.copy(alpha = 0.85f),
+                        color = Color.White.copy(alpha = 0.7f),
                         textAlign = TextAlign.Center,
                     )
                 }
@@ -128,27 +182,34 @@ fun FocusModeScreen(onClose: () -> Unit) {
                 Text(
                     text = label,
                     style = MaterialTheme.typography.titleMedium,
-                    color = Color.White.copy(alpha = 0.75f),
+                    color = Color.White.copy(alpha = 0.6f),
                 )
                 Spacer(modifier = Modifier.height(4.dp))
+                // таймер в цвет события, на чёрном смотрится сочно
                 Text(
                     text = formatCountdown(targetMs - nowMs),
                     style = MaterialTheme.typography.displayLarge,
-                    color = Color.White,
+                    color = accentColor,
                     fontWeight = FontWeight.Bold,
                 )
             }
         }
 
-        // подсказка снизу про выход по тапу
-        Text(
-            text = "Тапни в любом месте чтобы выйти",
-            style = MaterialTheme.typography.bodySmall,
-            color = Color.White.copy(alpha = 0.7f),
+        // подсказка снизу про выход по тапу - сама прячется через 4 сек
+        AnimatedVisibility(
+            visible = hintVisible,
+            enter = fadeIn(),
+            exit = fadeOut(),
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(bottom = 24.dp),
-        )
+        ) {
+            Text(
+                text = "Тапни в любом месте чтобы выйти",
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.White.copy(alpha = 0.5f),
+            )
+        }
     }
 }
 
@@ -160,6 +221,16 @@ private fun formatCountdown(ms: Long): String {
     val s = total % 60
     return if (h > 0) "%d:%02d:%02d".format(h, m, s)
            else "%02d:%02d".format(m, s)
+}
+
+// идём по цепочке ContextWrapper-ов пока не найдём активити (либо null)
+private fun View.findActivity(): Activity? {
+    var ctx: Context? = this.context
+    while (ctx is android.content.ContextWrapper) {
+        if (ctx is Activity) return ctx
+        ctx = ctx.baseContext
+    }
+    return null
 }
 
 internal fun focusStateAt(state: TodayState, nowMillis: Long): TodayState {

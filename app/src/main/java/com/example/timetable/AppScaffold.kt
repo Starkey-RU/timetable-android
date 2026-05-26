@@ -99,31 +99,17 @@ fun AppScaffold(widthSize: WindowWidthSizeClass = WindowWidthSizeClass.Compact) 
         // в режиме с боковым меню Scaffold берёт остаток ширины, иначе занимает всё сам
         modifier = if (useRail && isTab) Modifier.weight(1f) else Modifier,
         topBar = {
-            // верхняя панель показывается в двух случаях:
-            // - широкий экран на любом табе - правая кнопка настроек, чтоб не лазить в нижнее меню
-            // - таб "сегодня" на любом экране - кнопка фокус-режима
-            val showFocus = isTab && currentRoute == Tab.Today.route
-            val showWideSettings = startedWide && isTab
-            if (showFocus || showWideSettings) {
-                val title = Tab.entries.firstOrNull { it.route == currentRoute }?.label ?: "Расписание"
+            // верхняя панель нужна только на табе "сегодня" - там кнопка фокус-режима.
+            // на остальных табах топбара нет вообще, чтоб не занимать место зря
+            if (isTab && currentRoute == Tab.Today.route) {
                 TopAppBar(
-                    title = { Text(title) },
+                    title = { Text(Tab.Today.label) },
                     actions = {
-                        if (showFocus) {
-                            IconButton(onClick = { nav.navigate("focus") }) {
-                                Icon(
-                                    imageVector = Icons.Filled.CenterFocusStrong,
-                                    contentDescription = "Фокус",
-                                )
-                            }
-                        }
-                        if (showWideSettings) {
-                            IconButton(onClick = { nav.navigate("foldable_settings") }) {
-                                Icon(
-                                    imageVector = Icons.Filled.Settings,
-                                    contentDescription = "Настройки",
-                                )
-                            }
+                        IconButton(onClick = { nav.navigate("focus") }) {
+                            Icon(
+                                imageVector = Icons.Filled.CenterFocusStrong,
+                                contentDescription = "Фокус",
+                            )
                         }
                     },
                 )
