@@ -56,12 +56,15 @@ class TodayWidgetReceiver : GlanceAppWidgetReceiver() {
 private fun WidgetBody(state: TodayState) {
     // сколько карточек влезает по высоте виджета
     val size = LocalSize.current
-    val maxItems = when {
+    val byHeight = when {
         size.height < 100.dp -> 1
         size.height < 180.dp -> 2
         size.height < 280.dp -> 3
         else -> 5
     }
+    // лимит из настроек, дальше ещё ужимаем по высоте чтоб ничего не обрезалось
+    val userLimit = AppPrefs.widgetEventLimit.value.coerceIn(1, 5)
+    val maxItems = minOf(byHeight, userLimit)
 
     // упорядоченный список ближайших: сначала идущие сейчас, потом next, потом later
     val ordered = buildList {
@@ -75,6 +78,7 @@ private fun WidgetBody(state: TodayState) {
     Column(
         modifier = GlanceModifier
             .fillMaxSize()
+            .cornerRadius(20.dp)
             .background(GlanceTheme.colors.background)
             .padding(12.dp)
             .clickable(actionStartActivity<MainActivity>()),
