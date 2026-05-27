@@ -6,7 +6,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -21,6 +24,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -125,6 +130,9 @@ fun EventEditorScreen(eventId: Long?, onClose: () -> Unit) {
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            // быстрые шаблоны - тапнул чип, поля сами заполнились
+            TemplateChipsRow(onPick = vm::applyTemplate)
+
             OutlinedTextField(
                 value = form.title,
                 onValueChange = vm::setTitle,
@@ -298,6 +306,41 @@ fun EventEditorScreen(eventId: Long?, onClose: () -> Unit) {
                 TextButton(onClick = { conflict = null }) { Text("Отмена") }
             },
         )
+    }
+}
+
+// ряд чипов-пресетов поверх формы - тык по чипу и редактор заполнен
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun TemplateChipsRow(onPick: (EventTemplate) -> Unit) {
+    var selectedId by remember { mutableStateOf<String?>(null) }
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = "Быстрый шаблон",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(top = 6.dp),
+        ) {
+            DEFAULT_TEMPLATES.forEach { tpl ->
+                val stripe = EventColors.stripe(tpl.colorKey)
+                FilterChip(
+                    selected = selectedId == tpl.id,
+                    onClick = {
+                        selectedId = tpl.id
+                        onPick(tpl)
+                    },
+                    label = { Text(tpl.label) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = stripe.copy(alpha = 0.2f),
+                        selectedLabelColor = stripe,
+                    ),
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(6.dp))
     }
 }
 

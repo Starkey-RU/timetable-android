@@ -114,6 +114,20 @@ class EventEditorViewModel(
         _form.value = _form.value.copy(recurrenceMask = 0, weekParity = WeekParity.ALL)
     }
 
+    // быстрый пресет: цвет/иконку ставим всегда, название - только если поле пустое.
+    // конец сдвигаем относительно текущего начала на длительность из шаблона.
+    fun applyTemplate(tpl: EventTemplate) {
+        val f = _form.value
+        val newTitle = if (f.title.isBlank()) tpl.titlePrefix else f.title
+        val newEnd = f.start.plusMinutes(tpl.defaultDurationMinutes.toLong())
+        _form.value = f.copy(
+            title = newTitle,
+            colorKey = tpl.colorKey,
+            iconKey = tpl.iconKey,
+            end = newEnd,
+        )
+    }
+
     fun save(onDone: () -> Unit) {
         val f = _form.value
         if (f.title.isBlank()) return
