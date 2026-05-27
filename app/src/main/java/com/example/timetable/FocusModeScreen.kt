@@ -3,6 +3,7 @@ package com.example.timetable
 import android.app.Activity
 import android.content.Context
 import android.view.View
+import android.view.WindowManager
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -15,10 +16,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -66,14 +64,23 @@ fun FocusModeScreen(onClose: () -> Unit) {
     DisposableEffect(Unit) {
         val activity = view.findActivity()
         val window = activity?.window
+        // снимаем значение pref один раз чтоб смена в настройках не дёргала флаг по ходу сессии
+        val keepOn = AppPrefs.focusKeepScreenOn.value
         if (window != null) {
             val controller = WindowCompat.getInsetsController(window, view)
             val previousBehavior = controller.systemBarsBehavior
             controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
             controller.hide(WindowInsetsCompat.Type.systemBars())
+            // если в настройках включено - не даём экрану гаснуть пока висит фокус
+            if (keepOn) {
+                window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            }
             onDispose {
                 controller.show(WindowInsetsCompat.Type.systemBars())
                 controller.systemBarsBehavior = previousBehavior
+                if (keepOn) {
+                    window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                }
             }
         } else {
             onDispose { }
@@ -119,20 +126,6 @@ fun FocusModeScreen(onClose: () -> Unit) {
                 .align(Alignment.TopStart)
                 .padding(16.dp),
         )
-
-        // крестик в правом верхнем углу - дублирует тап
-        IconButton(
-            onClick = onClose,
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(12.dp),
-        ) {
-            Icon(
-                imageVector = Icons.Filled.Close,
-                contentDescription = "Закрыть",
-                tint = Color.White.copy(alpha = 0.8f),
-            )
-        }
 
         if (upcoming == null) {
             // на сегодня вообще пусто - просто короткая фраза по центру
