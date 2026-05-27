@@ -73,6 +73,24 @@ object AppPrefs {
     // динамические цвета из обоев (material you), доступно с android 12
     val useDynamicColors: MutableState<Boolean> = mutableStateOf(false)
 
+    // тап по карточке открывает шторку с деталями (если выкл - сразу редактор как раньше)
+    val useEventDetailSheet: MutableState<Boolean> = mutableStateOf(false)
+
+    // режим учёбы: показывает поля преподаватель/аудитория/номер пары. выкл - они скрыты в редакторе
+    val studyMode: MutableState<Boolean> = mutableStateOf(true)
+
+    // при смене времени начала автоматом сдвигать конец на +1 час
+    val autoExtendEndTime: MutableState<Boolean> = mutableStateOf(true)
+
+    // пользователь скрыл подсказку про события "сквозь день" навсегда
+    val crossDayHintDismissed: MutableState<Boolean> = mutableStateOf(false)
+
+    // фон режима фокуса
+    val focusGradient: MutableState<FocusGradient> = mutableStateOf(FocusGradient.Amoled)
+
+    // показывать кнопку фокус-режима в топбаре только когда nav вертикальный (т.е. на широких скрыть)
+    val focusButtonCompactOnly: MutableState<Boolean> = mutableStateOf(false)
+
     // используется в expandRecurrence: null если режим выключен или дата не задана
     fun effectiveSemesterStart(zone: ZoneId = ZoneId.systemDefault()): LocalDate? {
         if (!useSemesterWeeks.value) return null
@@ -111,6 +129,12 @@ object AppPrefs {
     private const val K_REMINDER_LEAD = "reminder_lead_min"
     private const val K_DUP_OPEN_EDITOR = "duplicate_open_editor"
     private const val K_DYNAMIC_COLORS = "dynamic_colors"
+    private const val K_EVENT_DETAIL_SHEET = "event_detail_sheet"
+    private const val K_STUDY_MODE = "study_mode"
+    private const val K_AUTO_EXTEND_END = "auto_extend_end"
+    private const val K_CROSS_DAY_HINT_DISMISSED = "cross_day_hint_dismissed"
+    private const val K_FOCUS_GRADIENT = "focus_gradient"
+    private const val K_FOCUS_BTN_COMPACT_ONLY = "focus_btn_compact_only"
     private const val NO_SEMESTER = Long.MIN_VALUE
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -139,6 +163,12 @@ object AppPrefs {
         reminderLeadMinutes.value = prefs.getInt(K_REMINDER_LEAD, 10)
         duplicateOpensEditor.value = prefs.getBoolean(K_DUP_OPEN_EDITOR, false)
         useDynamicColors.value = prefs.getBoolean(K_DYNAMIC_COLORS, false)
+        useEventDetailSheet.value = prefs.getBoolean(K_EVENT_DETAIL_SHEET, false)
+        studyMode.value = prefs.getBoolean(K_STUDY_MODE, true)
+        autoExtendEndTime.value = prefs.getBoolean(K_AUTO_EXTEND_END, true)
+        crossDayHintDismissed.value = prefs.getBoolean(K_CROSS_DAY_HINT_DISMISSED, false)
+        focusGradient.value = readEnum(prefs, K_FOCUS_GRADIENT, FocusGradient.entries) ?: FocusGradient.Amoled
+        focusButtonCompactOnly.value = prefs.getBoolean(K_FOCUS_BTN_COMPACT_ONLY, false)
 
         // подписываемся на изменения и пишем назад. drop(1) чтоб не записать стартовое значение
         scope.launch { snapshotFlow { palette.value }.drop(1).collect { write(prefs, K_PALETTE, it.name) } }
@@ -162,6 +192,12 @@ object AppPrefs {
         scope.launch { snapshotFlow { reminderLeadMinutes.value }.drop(1).collect { writeInt(prefs, K_REMINDER_LEAD, it) } }
         scope.launch { snapshotFlow { duplicateOpensEditor.value }.drop(1).collect { writeBool(prefs, K_DUP_OPEN_EDITOR, it) } }
         scope.launch { snapshotFlow { useDynamicColors.value }.drop(1).collect { writeBool(prefs, K_DYNAMIC_COLORS, it) } }
+        scope.launch { snapshotFlow { useEventDetailSheet.value }.drop(1).collect { writeBool(prefs, K_EVENT_DETAIL_SHEET, it) } }
+        scope.launch { snapshotFlow { studyMode.value }.drop(1).collect { writeBool(prefs, K_STUDY_MODE, it) } }
+        scope.launch { snapshotFlow { autoExtendEndTime.value }.drop(1).collect { writeBool(prefs, K_AUTO_EXTEND_END, it) } }
+        scope.launch { snapshotFlow { crossDayHintDismissed.value }.drop(1).collect { writeBool(prefs, K_CROSS_DAY_HINT_DISMISSED, it) } }
+        scope.launch { snapshotFlow { focusGradient.value }.drop(1).collect { write(prefs, K_FOCUS_GRADIENT, it.name) } }
+        scope.launch { snapshotFlow { focusButtonCompactOnly.value }.drop(1).collect { writeBool(prefs, K_FOCUS_BTN_COMPACT_ONLY, it) } }
     }
 
     // формат "ключ:минуты,..." - читаем терпимо, всё что не парсится пропускаем
