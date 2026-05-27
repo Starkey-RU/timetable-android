@@ -91,6 +91,12 @@ object AppPrefs {
     // показывать кнопку фокус-режима в топбаре только когда nav вертикальный (т.е. на широких скрыть)
     val focusButtonCompactOnly: MutableState<Boolean> = mutableStateOf(false)
 
+    // не давать экрану гаснуть пока открыт фокус-режим
+    val focusKeepScreenOn: MutableState<Boolean> = mutableStateOf(true)
+
+    // сколько событий показывать на виджете today (диапазон 1..5)
+    val widgetEventLimit: MutableState<Int> = mutableStateOf(3)
+
     // используется в expandRecurrence: null если режим выключен или дата не задана
     fun effectiveSemesterStart(zone: ZoneId = ZoneId.systemDefault()): LocalDate? {
         if (!useSemesterWeeks.value) return null
@@ -135,6 +141,8 @@ object AppPrefs {
     private const val K_CROSS_DAY_HINT_DISMISSED = "cross_day_hint_dismissed"
     private const val K_FOCUS_GRADIENT = "focus_gradient"
     private const val K_FOCUS_BTN_COMPACT_ONLY = "focus_btn_compact_only"
+    private const val K_FOCUS_KEEP_SCREEN_ON = "focus_keep_screen_on"
+    private const val K_WIDGET_EVENT_LIMIT = "widget_event_limit"
     private const val NO_SEMESTER = Long.MIN_VALUE
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -169,6 +177,8 @@ object AppPrefs {
         crossDayHintDismissed.value = prefs.getBoolean(K_CROSS_DAY_HINT_DISMISSED, false)
         focusGradient.value = readEnum(prefs, K_FOCUS_GRADIENT, FocusGradient.entries) ?: FocusGradient.Amoled
         focusButtonCompactOnly.value = prefs.getBoolean(K_FOCUS_BTN_COMPACT_ONLY, false)
+        focusKeepScreenOn.value = prefs.getBoolean(K_FOCUS_KEEP_SCREEN_ON, true)
+        widgetEventLimit.value = prefs.getInt(K_WIDGET_EVENT_LIMIT, 3).coerceIn(1, 5)
 
         // подписываемся на изменения и пишем назад. drop(1) чтоб не записать стартовое значение
         scope.launch { snapshotFlow { palette.value }.drop(1).collect { write(prefs, K_PALETTE, it.name) } }
@@ -198,6 +208,8 @@ object AppPrefs {
         scope.launch { snapshotFlow { crossDayHintDismissed.value }.drop(1).collect { writeBool(prefs, K_CROSS_DAY_HINT_DISMISSED, it) } }
         scope.launch { snapshotFlow { focusGradient.value }.drop(1).collect { write(prefs, K_FOCUS_GRADIENT, it.name) } }
         scope.launch { snapshotFlow { focusButtonCompactOnly.value }.drop(1).collect { writeBool(prefs, K_FOCUS_BTN_COMPACT_ONLY, it) } }
+        scope.launch { snapshotFlow { focusKeepScreenOn.value }.drop(1).collect { writeBool(prefs, K_FOCUS_KEEP_SCREEN_ON, it) } }
+        scope.launch { snapshotFlow { widgetEventLimit.value }.drop(1).collect { writeInt(prefs, K_WIDGET_EVENT_LIMIT, it) } }
     }
 
     // формат "ключ:минуты,..." - читаем терпимо, всё что не парсится пропускаем
