@@ -44,6 +44,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedIconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -134,6 +135,32 @@ fun SettingsScreen(
     // подменю "экспорт" и "импорт" - чтоб 6 кнопок не лежали портянкой
     var showExportMenu by remember { mutableStateOf(false) }
     var showImportMenu by remember { mutableStateOf(false) }
+    // диалог подтверждения восстановления + uri выбранного файла-бэкапа
+    var askRestoreUri by remember { mutableStateOf<Uri?>(null) }
+
+    // лаунчер saf для создания файла-бэкапа. имя по умолчанию с датой и временем
+    val backupLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/octet-stream"),
+    ) { uri ->
+        if (uri != null) {
+            scope.launch {
+                BackupHelper.backupTo(context, uri)
+                    .onSuccess {
+                        Toast.makeText(context, "Копия сохранена", Toast.LENGTH_SHORT).show()
+                    }
+                    .onFailure {
+                        Toast.makeText(context, "Не получилось сохранить: ${it.message}", Toast.LENGTH_LONG).show()
+                    }
+            }
+        }
+    }
+
+    // лаунчер saf для выбора файла-бэкапа. показываем подтверждение, потом восстанавливаем
+    val restoreLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri != null) askRestoreUri = uri
+    }
 
     LazyColumn(
         modifier = Modifier.fillMaxWidth(),
@@ -182,6 +209,12 @@ fun SettingsScreen(
                     subtitle = "если выключить - в навигации останутся только иконки",
                     checked = showLabels,
                     onCheckedChange = { AppPrefs.showNavLabels.value = it },
+                )
+                SettingsDivider()
+                val widgetLimit by AppPrefs.widgetEventLimit
+                WidgetLimitRow(
+                    current = widgetLimit,
+                    onChange = { AppPrefs.widgetEventLimit.value = it },
                 )
                 SettingsDivider()
                 val collapseDone by AppPrefs.collapseDoneByDefault
@@ -372,6 +405,14 @@ fun SettingsScreen(
                     checked = focusCompact,
                     onCheckedChange = { AppPrefs.focusButtonCompactOnly.value = it },
                 )
+                SettingsDivider()
+                val keepOn by AppPrefs.focusKeepScreenOn
+                SwitchRow(
+                    title = "Не гасить экран в фокусе",
+                    subtitle = "Пока открыт режим фокуса, экран не выключится по таймауту",
+                    checked = keepOn,
+                    onCheckedChange = { AppPrefs.focusKeepScreenOn.value = it },
+                )
             }
         }
 
@@ -413,6 +454,42 @@ fun SettingsScreen(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     ButtonLabel("Импорт")
+                }
+            }
+        }
+
+        item {
+            SettingsGroup(title = "Данные") {
+                Text(
+                    text = "Полная копия базы одним файлом. Удобно перед чисткой или переездом на другой телефон.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+                Button(
+                    onClick = {
+                        val stamp = java.time.format.DateTimeFormatter
+                            .ofPattern("yyyyMMdd_HHmm")
+                            .format(java.time.LocalDateTime.now())
+                        backupLauncher.launch("timetable_$stamp.db")
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    ButtonLabel("Сохранить копию БД")
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = {
+                        // *\/* нужен потому что некоторые файловые менеджеры не выдают саму бд
+                        // под application/octet-stream
+                        restoreLauncher.launch(
+                            arrayOf("application/octet-stream", "application/x-sqlite3", "*/*"),
+                        )
+                    },
+                    enabled = !guestMode,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    ButtonLabel("Восстановить из копии")
                 }
             }
         }
@@ -579,6 +656,32 @@ fun SettingsScreen(
         ) {
             ArchiveScreen(onClose = { showArchive = false })
         }
+    }
+
+    val pendingRestore = askRestoreUri
+    if (pendingRestore != null) {
+        AlertDialog(
+            onDismissRequest = { askRestoreUri = null },
+            title = { Text("Восстановить из копии") },
+            text = { Text("Текущие данные будут заменены. Продолжить?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    askRestoreUri = null
+                    scope.launch {
+                        BackupHelper.restoreFrom(context, pendingRestore)
+                            .onSuccess {
+                                Toast.makeText(context, "Готово, перезапустите приложение", Toast.LENGTH_LONG).show()
+                            }
+                            .onFailure {
+                                Toast.makeText(context, "Не получилось восстановить: ${it.message}", Toast.LENGTH_LONG).show()
+                            }
+                    }
+                }) { Text("Да") }
+            },
+            dismissButton = {
+                TextButton(onClick = { askRestoreUri = null }) { Text("Отмена") }
+            },
+        )
     }
 
     if (showExportMenu) {
@@ -1571,5 +1674,29 @@ private fun DurationsDialog(
             TextButton(onClick = onDismiss) { Text("Отмена") }
         },
     )
+}
+
+// слайдер от 1 до 5 - сколько событий рисуем в виджете на главном экране
+@Composable
+private fun WidgetLimitRow(current: Int, onChange: (Int) -> Unit) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "Событий на виджете: $current",
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.bodyLarge,
+            )
+        }
+        // steps=3 между крайними точками 1f и 5f даёт 5 позиций (1,2,3,4,5)
+        Slider(
+            value = current.toFloat(),
+            onValueChange = { onChange(it.toInt().coerceIn(1, 5)) },
+            valueRange = 1f..5f,
+            steps = 3,
+        )
+    }
 }
 

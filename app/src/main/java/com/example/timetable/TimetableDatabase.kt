@@ -20,6 +20,9 @@ abstract class TimetableDatabase : RoomDatabase() {
     abstract fun archivedEventDao(): ArchivedEventDao
 
     companion object {
+        // имя файла бд - вынесли в константу, чтоб переиспользовать в бэкапе
+        internal const val NAME = "timetable.db"
+
         @Volatile private var instance: TimetableDatabase? = null
 
         fun get(context: Context): TimetableDatabase {
@@ -35,7 +38,7 @@ abstract class TimetableDatabase : RoomDatabase() {
             db = Room.databaseBuilder(
                 context.applicationContext,
                 TimetableDatabase::class.java,
-                "timetable.db",
+                NAME,
             )
                 // на учебном проекте схема ещё крутится, миграции пока не пишем
                 .fallbackToDestructiveMigration()
