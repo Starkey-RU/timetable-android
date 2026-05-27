@@ -100,10 +100,13 @@ fun FocusModeScreen(onClose: () -> Unit) {
     // цвет события используем как акцент для иконки и таймера
     val accentColor = upcoming?.let { EventColors.stripe(it.colorKey) } ?: Color.White
 
+    // фон берём из настроек - амолед-чёрный (по умолчанию) или один из тёмных градиентов
+    val bgBrush = AppPrefs.focusGradient.value.brush
+
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black)
+            .background(bgBrush)
             // тап в любом месте закрывает - так и в подсказке написано
             .clickable { onClose() },
     ) {

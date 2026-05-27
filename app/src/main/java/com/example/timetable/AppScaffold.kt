@@ -102,14 +102,21 @@ fun AppScaffold(widthSize: WindowWidthSizeClass = WindowWidthSizeClass.Compact) 
             // верхняя панель нужна только на табе "сегодня" - там кнопка фокус-режима.
             // на остальных табах топбара нет вообще, чтоб не занимать место зря
             if (isTab && currentRoute == Tab.Today.route) {
+                // на широком экране кнопку фокуса можно скрыть через настройку -
+                // на телефоне (compact) показываем всегда, чтоб не терять быстрый доступ
+                val isCompact = widthSize == WindowWidthSizeClass.Compact
+                val hideFocusBtn by AppPrefs.focusButtonCompactOnly
+                val showFocusBtn = isCompact || !hideFocusBtn
                 TopAppBar(
                     title = { Text(Tab.Today.label) },
                     actions = {
-                        IconButton(onClick = { nav.navigate("focus") }) {
-                            Icon(
-                                imageVector = Icons.Filled.CenterFocusStrong,
-                                contentDescription = "Фокус",
-                            )
+                        if (showFocusBtn) {
+                            IconButton(onClick = { nav.navigate("focus") }) {
+                                Icon(
+                                    imageVector = Icons.Filled.CenterFocusStrong,
+                                    contentDescription = "Фокус",
+                                )
+                            }
                         }
                     },
                 )
