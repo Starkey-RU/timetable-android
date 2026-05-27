@@ -28,6 +28,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.AlertDialog
@@ -75,6 +76,9 @@ fun EventEditorScreen(eventId: Long?, onClose: () -> Unit) {
     val form by vm.form.collectAsState()
     val notFound by vm.notFound.collectAsState()
     val isGuest by AppPrefs.isGuest
+    // крч если режим учёбы выключен - не показываем поля препод/пара/аудитория
+    val studyMode = AppPrefs.studyMode.value
+    val crossDayHintDismissed = AppPrefs.crossDayHintDismissed.value
 
     // если событие удалили пока редактор грузился - просто выходим
     LaunchedEffect(notFound) {
@@ -135,31 +139,33 @@ fun EventEditorScreen(eventId: Long?, onClose: () -> Unit) {
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
-            OutlinedTextField(
-                value = form.teacher,
-                onValueChange = vm::setTeacher,
-                label = { Text("Преподаватель") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
+            if (studyMode) {
                 OutlinedTextField(
-                    value = form.classNumber,
-                    onValueChange = vm::setClassNumber,
-                    label = { Text("Пара №") },
+                    value = form.teacher,
+                    onValueChange = vm::setTeacher,
+                    label = { Text("Преподаватель") },
                     singleLine = true,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
                 )
-                OutlinedTextField(
-                    value = form.room,
-                    onValueChange = vm::setRoom,
-                    label = { Text("Аудитория") },
-                    singleLine = true,
-                    modifier = Modifier.weight(1f),
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    OutlinedTextField(
+                        value = form.classNumber,
+                        onValueChange = vm::setClassNumber,
+                        label = { Text("Пара №") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f),
+                    )
+                    OutlinedTextField(
+                        value = form.room,
+                        onValueChange = vm::setRoom,
+                        label = { Text("Аудитория") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
             }
 
             Text("Цвет", style = MaterialTheme.typography.labelLarge)
@@ -190,6 +196,12 @@ fun EventEditorScreen(eventId: Long?, onClose: () -> Unit) {
                     onClick = { showEndPicker = true },
                     modifier = Modifier.weight(1f),
                 )
+            }
+
+            // если конец раньше начала - событие переезжает через полночь
+            // показываем подсказку один раз, пока пользователь не закроет её
+            if (form.end <= form.start && !crossDayHintDismissed) {
+                CrossDayHint(onDismiss = { AppPrefs.crossDayHintDismissed.value = true })
             }
 
             RecurrenceField(
@@ -286,6 +298,33 @@ fun EventEditorScreen(eventId: Long?, onClose: () -> Unit) {
                 TextButton(onClick = { conflict = null }) { Text("Отмена") }
             },
         )
+    }
+}
+
+// баннер про переход через полночь, прячется навсегда после тапа
+@Composable
+private fun CrossDayHint(onDismiss: () -> Unit) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.tertiaryContainer,
+        tonalElevation = 1.dp,
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Text(
+                text = "Событие переходит через полночь. Считается что оно идёт с указанного начала до конца на следующий день.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onTertiaryContainer,
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+            ) {
+                TextButton(onClick = onDismiss) {
+                    Text("Понятно, больше не показывать")
+                }
+            }
+        }
     }
 }
 

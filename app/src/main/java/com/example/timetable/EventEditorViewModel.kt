@@ -88,7 +88,15 @@ class EventEditorViewModel(
         }
         _form.value = newForm
     }
-    fun setStart(time: LocalTime) { _form.value = _form.value.copy(start = time) }
+    fun setStart(time: LocalTime) {
+        val f = _form.value
+        // если в настройках включён авто-сдвиг конца - двигаем конец на час позже нового начала
+        if (AppPrefs.autoExtendEndTime.value) {
+            _form.value = f.copy(start = time, end = time.plusHours(1))
+        } else {
+            _form.value = f.copy(start = time)
+        }
+    }
     fun setEnd(time: LocalTime) { _form.value = _form.value.copy(end = time) }
     fun setDate(date: LocalDate) { _form.value = _form.value.copy(date = date) }
     fun setTeacher(value: String) { _form.value = _form.value.copy(teacher = value) }
