@@ -117,6 +117,12 @@ fun FocusModeScreen(onClose: () -> Unit) {
             // тап в любом месте закрывает - так и в подсказке написано
             .clickable { onClose() },
     ) {
+        // затемняющая накладка чтоб белый текст читался на ярких градиентах
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.25f)),
+        )
         // маленькие часы в левом верхнем углу
         Text(
             text = clockText,

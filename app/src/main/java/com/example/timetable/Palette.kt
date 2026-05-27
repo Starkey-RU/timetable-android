@@ -1,6 +1,5 @@
 package com.example.timetable
 
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 
 // 4 пресета цветовой схемы для material3, влияет на primary/secondary/tertiary
@@ -60,10 +59,3 @@ enum class Palette(
     );
 }
 
-enum class GradientPreset(val title: String, val from: Color, val to: Color) {
-    WineBlack("Wine -> Black", Color(0xFF95122C), Color(0xFF100C08)),
-    OrangeCrimson("Orange -> Crimson", Color(0xFFFF6B00), Color(0xFFE8003A)),
-    GoldOrangeRed("Gold -> Orange-Red", Color(0xFFFFD700), Color(0xFFFF4500));
-
-    val brush: Brush get() = Brush.linearGradient(listOf(from, to))
-}

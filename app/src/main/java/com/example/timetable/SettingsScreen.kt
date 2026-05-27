@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -33,13 +34,18 @@ import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material.icons.filled.QrCodeScanner
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedIconButton
 import androidx.compose.material3.OutlinedTextField
@@ -65,6 +71,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -137,6 +144,8 @@ fun SettingsScreen(
     var showImportMenu by remember { mutableStateOf(false) }
     // диалог подтверждения восстановления + uri выбранного файла-бэкапа
     var askRestoreUri by remember { mutableStateOf<Uri?>(null) }
+    // какой пикер сейчас открыт: header / focus / null
+    var openPicker by remember { mutableStateOf<GradientTarget?>(null) }
 
     // лаунчер saf для создания файла-бэкапа. имя по умолчанию с датой и временем
     val backupLauncher = rememberLauncherForActivityResult(
@@ -193,7 +202,29 @@ fun SettingsScreen(
                     PaletteButton(current = palette, onPick = { AppPrefs.palette.value = it })
                 }
                 SettingsDivider()
-                GradientButton(current = gradient, onPick = { AppPrefs.gradient.value = it })
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { openPicker = GradientTarget.Header }
+                        .padding(vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(text = "Градиент шапки", style = MaterialTheme.typography.bodyLarge)
+                        Text(
+                            text = gradient.title,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .size(28.dp)
+                            .clip(CircleShape)
+                            .background(gradient.brush)
+                            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape),
+                    )
+                }
                 SettingsDivider()
                 val showGrad by AppPrefs.showGradientHeader
                 SwitchRow(
@@ -393,10 +424,29 @@ fun SettingsScreen(
         item {
             SettingsGroup(title = "Режим фокуса") {
                 val focusGrad by AppPrefs.focusGradient
-                FocusGradientPicker(
-                    current = focusGrad,
-                    onPick = { AppPrefs.focusGradient.value = it },
-                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { openPicker = GradientTarget.Focus }
+                        .padding(vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(text = "Фон фокус-режима", style = MaterialTheme.typography.bodyLarge)
+                        Text(
+                            text = focusGrad.title,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .size(28.dp)
+                            .clip(CircleShape)
+                            .background(focusGrad.brush)
+                            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape),
+                    )
+                }
                 SettingsDivider()
                 val focusCompact by AppPrefs.focusButtonCompactOnly
                 SwitchRow(
@@ -475,6 +525,12 @@ fun SettingsScreen(
                     },
                     modifier = Modifier.fillMaxWidth(),
                 ) {
+                    Icon(
+                        imageVector = Icons.Filled.Save,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
                     ButtonLabel("Сохранить копию БД")
                 }
                 Spacer(modifier = Modifier.height(8.dp))
@@ -489,6 +545,12 @@ fun SettingsScreen(
                     enabled = !guestMode,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
+                    Icon(
+                        imageVector = Icons.Filled.Refresh,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
                     ButtonLabel("Восстановить из копии")
                 }
             }
@@ -733,7 +795,28 @@ fun SettingsScreen(
             },
         )
     }
+
+    val focusGradForSheet by AppPrefs.focusGradient
+    openPicker?.let { target ->
+        when (target) {
+            GradientTarget.Header -> GradientPickerSheet(
+                title = "Градиент шапки",
+                current = gradient,
+                onPick = { AppPrefs.gradient.value = it },
+                onDismiss = { openPicker = null },
+            )
+            GradientTarget.Focus -> GradientPickerSheet(
+                title = "Фон фокус-режима",
+                current = focusGradForSheet,
+                onPick = { AppPrefs.focusGradient.value = it },
+                onDismiss = { openPicker = null },
+            )
+        }
+    }
 }
+
+// какой именно градиент сейчас выбираем в шторке
+private enum class GradientTarget { Header, Focus }
 
 // строка варианта в подменю - иконка, заголовок и подзаголовок
 @Composable
@@ -957,7 +1040,7 @@ private fun ImportDialog(onDismiss: () -> Unit, onImport: (String) -> Unit) {
 }
 
 @Composable
-private fun HeroBanner(gradient: GradientPreset) {
+private fun HeroBanner(gradient: AppGradient) {
     // компактная плашка-разделитель сверху, просто чтоб было видно текущий градиент
     Box(
         modifier = Modifier
@@ -1347,136 +1430,71 @@ private fun AutoDeleteRow(currentDays: Int, onPick: (Int) -> Unit) {
     }
 }
 
-// одна строка-кнопка с превью текущего градиента, остальные варианты прячутся в диалог
+// общая шторка выбора градиента - сетка из 11 пресетов, используется и для шапки и для фокуса
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-private fun GradientButton(current: GradientPreset, onPick: (GradientPreset) -> Unit) {
-    var open by remember { mutableStateOf(false) }
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(14.dp))
-            .clickable { open = true }
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(
+private fun GradientPickerSheet(
+    title: String,
+    current: AppGradient,
+    onPick: (AppGradient) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState()
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+        Column(
             modifier = Modifier
-                .size(40.dp)
-                .clip(RoundedCornerShape(10.dp))
-                .background(current.brush),
-        )
-        Column(modifier = Modifier.weight(1f).padding(start = 14.dp)) {
-            Text(text = "Градиент", style = MaterialTheme.typography.bodyLarge)
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 24.dp),
+        ) {
             Text(
-                text = current.title,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                text = title,
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.padding(vertical = 8.dp),
             )
-        }
-        Text(
-            text = "Сменить",
-            color = MaterialTheme.colorScheme.primary,
-            style = MaterialTheme.typography.labelLarge,
-        )
-    }
-    if (open) {
-        AlertDialog(
-            onDismissRequest = { open = false },
-            title = { Text("Градиент") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    GradientPreset.entries.forEach { g ->
-                        val outlineColor = if (g == current) MaterialTheme.colorScheme.onSurface
-                                           else Color.Transparent
+            FlowRow(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                AppGradient.entries.forEach { g ->
+                    val selected = g == current
+                    Column(
+                        modifier = Modifier
+                            .width(80.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable {
+                                onPick(g)
+                                onDismiss()
+                            }
+                            .padding(vertical = 6.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
                         Box(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .height(52.dp)
-                                .clip(RoundedCornerShape(12.dp))
+                                .size(56.dp)
+                                .clip(CircleShape)
                                 .background(g.brush)
-                                .border(2.dp, outlineColor, RoundedCornerShape(12.dp))
-                                .clickable {
-                                    onPick(g)
-                                    open = false
-                                }
-                                .padding(horizontal = 16.dp),
-                            contentAlignment = Alignment.CenterStart,
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                if (g == current) {
-                                    Icon(
-                                        Icons.Filled.Check,
-                                        contentDescription = null,
-                                        tint = Color.White,
-                                        modifier = Modifier.padding(end = 8.dp),
-                                    )
-                                }
-                                Text(
-                                    text = g.title,
-                                    color = Color.White,
-                                    fontWeight = FontWeight.SemiBold,
-                                )
-                            }
-                        }
+                                .border(
+                                    width = if (selected) 2.dp else 1.dp,
+                                    color = if (selected) MaterialTheme.colorScheme.primary
+                                            else MaterialTheme.colorScheme.outlineVariant,
+                                    shape = CircleShape,
+                                ),
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = g.title,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (selected) MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        )
                     }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { open = false }) { Text("Закрыть") }
-            },
-        )
-    }
-}
-
-// горизонтальный селектор фонов для режима фокуса - кружки с градиентом и подписью
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun FocusGradientPicker(current: FocusGradient, onPick: (FocusGradient) -> Unit) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Text(text = "Фон режима фокуса", style = MaterialTheme.typography.bodyLarge)
-        Text(
-            text = "выбери цвет, который видишь когда включён фокус",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(modifier = Modifier.height(10.dp))
-        FlowRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            FocusGradient.entries.forEach { g ->
-                val selected = g == current
-                Column(
-                    modifier = Modifier
-                        .width(72.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .clickable { onPick(g) }
-                        .padding(vertical = 4.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(48.dp)
-                            .clip(CircleShape)
-                            .background(g.brush)
-                            .border(
-                                width = if (selected) 2.dp else 1.dp,
-                                color = if (selected) MaterialTheme.colorScheme.primary
-                                        else MaterialTheme.colorScheme.outlineVariant,
-                                shape = CircleShape,
-                            ),
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = g.title,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = if (selected) MaterialTheme.colorScheme.primary
-                                else MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
                 }
             }
         }

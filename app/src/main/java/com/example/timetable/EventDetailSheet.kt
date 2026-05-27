@@ -22,14 +22,14 @@ import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -156,22 +156,21 @@ fun EventDetailSheet(
                     Text(text = if (isGuest) "Открыть" else "Редактировать")
                 }
                 if (!isGuest) {
-                    OutlinedButton(
+                    FilledTonalIconButton(
                         onClick = onCopy,
                         modifier = Modifier.size(48.dp),
-                        contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
                     ) {
                         Icon(
                             imageVector = Icons.Filled.ContentCopy,
                             contentDescription = "Копировать",
                         )
                     }
-                    OutlinedButton(
+                    FilledTonalIconButton(
                         onClick = onDelete,
                         modifier = Modifier.size(48.dp),
-                        contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(
+                        colors = IconButtonDefaults.filledTonalIconButtonColors(
                             contentColor = MaterialTheme.colorScheme.error,
+                            containerColor = MaterialTheme.colorScheme.errorContainer,
                         ),
                     ) {
                         Icon(

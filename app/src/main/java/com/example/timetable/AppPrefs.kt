@@ -23,7 +23,7 @@ enum class ThemeMode(val title: String) {
 // настройки внешнего вида, читаются один раз при старте, пишутся в SharedPreferences при смене
 object AppPrefs {
     val palette: MutableState<Palette> = mutableStateOf(Palette.Teal)
-    val gradient: MutableState<GradientPreset> = mutableStateOf(GradientPreset.WineBlack)
+    val gradient: MutableState<AppGradient> = mutableStateOf(AppGradient.WineBlack)
     val theme: MutableState<ThemeMode> = mutableStateOf(ThemeMode.Auto)
     val showNavLabels: MutableState<Boolean> = mutableStateOf(true)
     val isGuest: MutableState<Boolean> = mutableStateOf(false)
@@ -86,7 +86,7 @@ object AppPrefs {
     val crossDayHintDismissed: MutableState<Boolean> = mutableStateOf(false)
 
     // фон режима фокуса
-    val focusGradient: MutableState<FocusGradient> = mutableStateOf(FocusGradient.Amoled)
+    val focusGradient: MutableState<AppGradient> = mutableStateOf(AppGradient.Amoled)
 
     // показывать кнопку фокус-режима в топбаре только когда nav вертикальный (т.е. на широких скрыть)
     val focusButtonCompactOnly: MutableState<Boolean> = mutableStateOf(false)
@@ -150,7 +150,7 @@ object AppPrefs {
     fun init(context: Context) {
         val prefs = context.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE)
         palette.value = readEnum(prefs, K_PALETTE, Palette.entries) ?: Palette.Teal
-        gradient.value = readEnum(prefs, K_GRADIENT, GradientPreset.entries) ?: GradientPreset.WineBlack
+        gradient.value = readEnum(prefs, K_GRADIENT, AppGradient.entries) ?: AppGradient.WineBlack
         theme.value = readEnum(prefs, K_THEME, ThemeMode.entries) ?: ThemeMode.Auto
         showNavLabels.value = prefs.getBoolean(K_NAV_LABELS, true)
         isGuest.value = prefs.getBoolean(K_GUEST, false)
@@ -175,7 +175,7 @@ object AppPrefs {
         studyMode.value = prefs.getBoolean(K_STUDY_MODE, true)
         autoExtendEndTime.value = prefs.getBoolean(K_AUTO_EXTEND_END, true)
         crossDayHintDismissed.value = prefs.getBoolean(K_CROSS_DAY_HINT_DISMISSED, false)
-        focusGradient.value = readEnum(prefs, K_FOCUS_GRADIENT, FocusGradient.entries) ?: FocusGradient.Amoled
+        focusGradient.value = readEnum(prefs, K_FOCUS_GRADIENT, AppGradient.entries) ?: AppGradient.Amoled
         focusButtonCompactOnly.value = prefs.getBoolean(K_FOCUS_BTN_COMPACT_ONLY, false)
         focusKeepScreenOn.value = prefs.getBoolean(K_FOCUS_KEEP_SCREEN_ON, true)
         widgetEventLimit.value = prefs.getInt(K_WIDGET_EVENT_LIMIT, 3).coerceIn(1, 5)

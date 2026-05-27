@@ -208,7 +208,7 @@ fun EventEditorScreen(eventId: Long?, onClose: () -> Unit) {
 
             // если конец раньше начала - событие переезжает через полночь
             // показываем подсказку один раз, пока пользователь не закроет её
-            if (form.end <= form.start && !crossDayHintDismissed) {
+            if (form.end < form.start && !crossDayHintDismissed) {
                 CrossDayHint(onDismiss = { AppPrefs.crossDayHintDismissed.value = true })
             }
 
