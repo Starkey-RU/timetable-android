@@ -90,7 +90,15 @@ fun TodayScreen(onEventClick: (Long) -> Unit = {}, onPickDay: (LocalDate) -> Uni
 
     // по тапу показываем подробности, редактирование открывается отдельной кнопкой
     var selectedForDetails by remember { mutableStateOf<EventEntity?>(null) }
-    val openDetails: (EventEntity) -> Unit = { ev -> selectedForDetails = ev }
+    // отдельный state для новой компактной шторки (toggle в настройках)
+    var selectedForDetail by remember { mutableStateOf<EventEntity?>(null) }
+    val openDetails: (EventEntity) -> Unit = { ev ->
+        if (AppPrefs.useEventDetailSheet.value) {
+            selectedForDetail = ev
+        } else {
+            selectedForDetails = ev
+        }
+    }
 
     // одна "сегодняшняя" дата на весь экран чтоб карточки не ушли в разные дни
     val today = remember(state.nowMillis) {
@@ -254,6 +262,28 @@ fun TodayScreen(onEventClick: (Long) -> Unit = {}, onPickDay: (LocalDate) -> Uni
                 }
                 selectedForDetails = null
             },
+        )
+    }
+
+    selectedForDetail?.let { ev ->
+        EventDetailSheet(
+            event = ev,
+            onEdit = {
+                selectedForDetail = null
+                onEventClick(ev.id)
+            },
+            onCopy = {
+                val openEditor = AppPrefs.duplicateOpensEditor.value
+                vm.duplicate(ev.id, 1L) { newId ->
+                    if (openEditor && newId != null) onEventClick(newId)
+                }
+                selectedForDetail = null
+            },
+            onDelete = {
+                vm.delete(ev.id)
+                selectedForDetail = null
+            },
+            onDismiss = { selectedForDetail = null },
         )
     }
 

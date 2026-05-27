@@ -75,6 +75,8 @@ fun SchedulesScreen(onEventClick: (Long) -> Unit = {}) {
 
     var query by rememberSaveable { mutableStateOf("") }
     var filter by rememberSaveable { mutableStateOf(ScheduleFilter.All) }
+    // выбранное событие для шторки с деталями (только когда не активен multi-select)
+    var selectedForDetail by remember { mutableStateOf<EventEntity?>(null) }
 
     val visible = remember(all, query, filter) { applyFilter(all, query, filter) }
     val selectionMode = selected.isNotEmpty()
@@ -188,6 +190,9 @@ fun SchedulesScreen(onEventClick: (Long) -> Unit = {}) {
                             if (selectionMode) {
                                 // в режиме выбора обычный тап тоже переключает
                                 vm.toggle(ev.id)
+                            } else if (AppPrefs.useEventDetailSheet.value) {
+                                // показываем шторку с деталями вместо прямого перехода в редактор
+                                selectedForDetail = ev
                             } else {
                                 onEventClick(ev.id)
                             }
@@ -204,6 +209,26 @@ fun SchedulesScreen(onEventClick: (Long) -> Unit = {}) {
                 }
             }
         }
+    }
+
+    selectedForDetail?.let { ev ->
+        EventDetailSheet(
+            event = ev,
+            onEdit = {
+                selectedForDetail = null
+                onEventClick(ev.id)
+            },
+            onCopy = {
+                // дублируем на тот же день и закрываем шторку
+                vm.duplicate(ev.id)
+                selectedForDetail = null
+            },
+            onDelete = {
+                vm.delete(ev.id)
+                selectedForDetail = null
+            },
+            onDismiss = { selectedForDetail = null },
+        )
     }
 }
 
