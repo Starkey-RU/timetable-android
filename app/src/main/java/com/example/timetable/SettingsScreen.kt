@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -205,6 +207,14 @@ fun SettingsScreen(
                     checked = hourDuration,
                     onCheckedChange = { AppPrefs.useHourDurationFormat.value = it },
                 )
+                SettingsDivider()
+                val detailSheet by AppPrefs.useEventDetailSheet
+                SwitchRow(
+                    title = "Открывать события шторкой",
+                    subtitle = "тап по карточке показывает детали в шторке, а не открывает редактор сразу",
+                    checked = detailSheet,
+                    onCheckedChange = { AppPrefs.useEventDetailSheet.value = it },
+                )
                 if (showFoldableSettingsButton) {
                     SettingsDivider()
                     OutlinedButton(
@@ -315,6 +325,14 @@ fun SettingsScreen(
         }
         item {
             SettingsGroup(title = "Учёба и повторения") {
+                val study by AppPrefs.studyMode
+                SwitchRow(
+                    title = "Режим учёбы",
+                    subtitle = "поля преподавателя, аудитории и номера пары в редакторе",
+                    checked = study,
+                    onCheckedChange = { AppPrefs.studyMode.value = it },
+                )
+                SettingsDivider()
                 val useSem by AppPrefs.useSemesterWeeks
                 SwitchRow(
                     title = "Считать недели от семестра",
@@ -328,6 +346,32 @@ fun SettingsScreen(
                 SettingsDivider()
                 val durations by AppPrefs.durationsByIcon
                 DurationsRow(current = durations, onPick = { AppPrefs.durationsByIcon.value = it })
+                SettingsDivider()
+                val autoEnd by AppPrefs.autoExtendEndTime
+                SwitchRow(
+                    title = "Авто-сдвиг конца события",
+                    subtitle = "при смене времени начала конец смещается на +1 час",
+                    checked = autoEnd,
+                    onCheckedChange = { AppPrefs.autoExtendEndTime.value = it },
+                )
+            }
+        }
+
+        item {
+            SettingsGroup(title = "Режим фокуса") {
+                val focusGrad by AppPrefs.focusGradient
+                FocusGradientPicker(
+                    current = focusGrad,
+                    onPick = { AppPrefs.focusGradient.value = it },
+                )
+                SettingsDivider()
+                val focusCompact by AppPrefs.focusButtonCompactOnly
+                SwitchRow(
+                    title = "Кнопка фокуса только на узких экранах",
+                    subtitle = "на планшете и foldable кнопка фокуса в верхней панели скрыта",
+                    checked = focusCompact,
+                    onCheckedChange = { AppPrefs.focusButtonCompactOnly.value = it },
+                )
             }
         }
 
@@ -1279,6 +1323,60 @@ private fun GradientButton(current: GradientPreset, onPick: (GradientPreset) -> 
                 TextButton(onClick = { open = false }) { Text("Закрыть") }
             },
         )
+    }
+}
+
+// горизонтальный селектор фонов для режима фокуса - кружки с градиентом и подписью
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun FocusGradientPicker(current: FocusGradient, onPick: (FocusGradient) -> Unit) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(text = "Фон режима фокуса", style = MaterialTheme.typography.bodyLarge)
+        Text(
+            text = "выбери цвет, который видишь когда включён фокус",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(modifier = Modifier.height(10.dp))
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            FocusGradient.entries.forEach { g ->
+                val selected = g == current
+                Column(
+                    modifier = Modifier
+                        .width(72.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable { onPick(g) }
+                        .padding(vertical = 4.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(CircleShape)
+                            .background(g.brush)
+                            .border(
+                                width = if (selected) 2.dp else 1.dp,
+                                color = if (selected) MaterialTheme.colorScheme.primary
+                                        else MaterialTheme.colorScheme.outlineVariant,
+                                shape = CircleShape,
+                            ),
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = g.title,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (selected) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
     }
 }
 
